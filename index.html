@@ -373,7 +373,7 @@
         if (/^switch\s*2$/i.test(cleanName)) cleanName = "Nintendo Switch 2";
         if (/^wii\s*u$/i.test(cleanName)) cleanName = "Wii U";
 
-        // Tier 1: Search Wikipedia Categories
+        // Tier 1: Search Category Members
         const catRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(cleanName.replace(/\s+/g, '_'))}_launch_titles&cmlimit=10&format=json&origin=*`);
         if (catRes.ok) {
           const catData = await catRes.json();
@@ -387,7 +387,7 @@
         }
 
         // Tier 2: Search the master launch titles table page
-        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=List_of_video_game_console_launch_titles&prop=text&format=json&origin=*`);
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=List_of_video_game_console_launch_titles&prop=text&redirects=1&format=json&origin=*`);
         if (res.ok) {
           const data = await res.json();
           const html = data && data.parse && data.parse.text && data.parse.text["*"];
@@ -457,7 +457,8 @@
 
         const targetTitle = resolvedTitle || cleanQuery;
 
-        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(targetTitle)}&format=json&origin=*`);
+        // Note: redirects=1 prevents stub magic tags like __EXPECTSHORTPAGE__
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&redirects=1&titles=${encodeURIComponent(targetTitle)}&format=json&origin=*`);
         if (!res.ok) return null;
         const data = await res.json();
         const pages = data.query && data.query.pages;
@@ -467,7 +468,14 @@
         if (pageId === "-1" || !pages[pageId].extract) return null;
         
         let extract = pages[pageId].extract;
-        extract = extract.replace(/\[\d+\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+        
+        // Strip footnotes, parentheses, and MediaWiki magic tags
+        extract = extract
+          .replace(/\[\d+\]/g, '')
+          .replace(/\([^)]*\)/g, '')
+          .replace(/__[A-Z_]+__/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
         
         extract = extract.replace(/released in Japan on [^,]+, in North America on [^,]+, and in Europe on [^.]+/i, (match) => {
           const year = match.match(/\b(19\d\d|20\d\d)\b/);
@@ -616,7 +624,10 @@
 
       if (isInformationalQuery) {
         const match = clean.match(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i);
-        const queryTerm = match ? match[1].replace(/^(?:some|the|a|an)\s+/i, '').trim() : clean;
+        const rawTerm = match ? match[1] : clean;
+        const queryTerm = rawTerm
+          .replace(/^(?:is|are|was|were|some|the|a|an)\s+/i, '')
+          .trim();
         
         if (!stopWords.has(queryTerm) && queryTerm.length >= 2) {
           const wikiSummary = await fetchWikipediaSummary(queryTerm, "general");
