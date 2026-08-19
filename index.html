@@ -292,7 +292,7 @@
     }
 
     function extractConsole(sentence) {
-      const match = sentence.match(/\b(switch\s*2|wii\s+u|wii|ps1\s+slim|ps1|ps2\s+slim(?:\s+[a-z0-9-]+)?|ps2|ps3\s+slim|ps3\s+super\s+slim|ps3|ps4\s+pro|ps4\s+slim|ps4|ps5\s+slim|ps5\s+pro|ps5|xbox\s+360\s+s|xbox\s+360\s+e|xbox\s+360|xbox\s+one\s+s|xbox\s+one\s+x|xbox\s+one|xbox\s+series\s+s|xbox\s+series\s+x|xbox|gamecube|switch\s+oled|switch\s+lite|switch|new\s+3ds\s+xl|3ds\s+xl|2ds\s+xl|3ds|2ds|ds\s+lite|dsi\s+xl|dsi|ds|psp\s+go|psp|ps\s*vita)\b/i);
+      const match = sentence.match(/\b(switch\s*2|nintendo\s+switch\s*2|wii\s+u|wii|ps1\s+slim|ps1|ps2\s+slim(?:\s+[a-z0-9-]+)?|ps2|ps3\s+slim|ps3\s+super\s+slim|ps3|ps4\s+pro|ps4\s+slim|ps4|ps5\s+slim|ps5\s+pro|ps5|xbox\s+360\s+s|xbox\s+360\s+e|xbox\s+360|xbox\s+one\s+s|xbox\s+one\s+x|xbox\s+one|xbox\s+series\s+s|xbox\s+series\s+x|xbox|gamecube|switch\s+oled|switch\s+lite|switch|new\s+3ds\s+xl|3ds\s+xl|2ds\s+xl|3ds|2ds|ds\s+lite|dsi\s+xl|dsi|ds|psp\s+go|psp|ps\s*vita)\b/i);
       return match ? match[1].trim() : null;
     }
 
@@ -344,7 +344,6 @@
       return "neutral";
     }
 
-    // Dynamic Wikipedia OpenSearch API Resolver
     async function searchWikipediaTitle(query) {
       try {
         const res = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&namespace=0&format=json&origin=*`);
@@ -356,21 +355,27 @@
       }
     }
 
-    // Pure Dynamic Wikipedia Lead Fetcher
     async function fetchWikipediaSummary(query, wantsDateOnly = false) {
       try {
         let cleanQuery = query.trim();
         
-        if (/^wii\s*u$/i.test(cleanQuery)) cleanQuery = 'Wii U';
-        else if (/^ps2$/i.test(cleanQuery)) cleanQuery = 'PlayStation 2';
-        else if (/^ps3$/i.test(cleanQuery)) cleanQuery = 'PlayStation 3';
-        else if (/^ps4$/i.test(cleanQuery)) cleanQuery = 'PlayStation 4';
-        else if (/^ps5$/i.test(cleanQuery)) cleanQuery = 'PlayStation 5';
-        else if (/^gamecube$/i.test(cleanQuery)) cleanQuery = 'GameCube';
-        else if (/^switch$/i.test(cleanQuery) || /^nintendo\s+switch$/i.test(cleanQuery)) cleanQuery = 'Nintendo Switch';
+        // Strip filler words to identify the true Wikipedia subject
+        let strippedTopic = cleanQuery
+          .replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|lookup|define)\s+/i, '')
+          .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|release date|specs)$/i, '')
+          .trim();
+
+        if (/^wii\s*u$/i.test(strippedTopic)) cleanQuery = 'Wii U';
+        else if (/^ps2$/i.test(strippedTopic)) cleanQuery = 'PlayStation 2';
+        else if (/^ps3$/i.test(strippedTopic)) cleanQuery = 'PlayStation 3';
+        else if (/^ps4$/i.test(strippedTopic)) cleanQuery = 'PlayStation 4';
+        else if (/^ps5$/i.test(strippedTopic)) cleanQuery = 'PlayStation 5';
+        else if (/^gamecube$/i.test(strippedTopic)) cleanQuery = 'GameCube';
+        else if (/^switch$/i.test(strippedTopic) || /^nintendo\s+switch$/i.test(strippedTopic)) cleanQuery = 'Nintendo Switch';
+        else if (/^switch\s*2$/i.test(strippedTopic) || /^nintendo\s+switch\s*2$/i.test(strippedTopic)) cleanQuery = 'Nintendo Switch 2';
         else {
-          const resolvedTitle = await searchWikipediaTitle(cleanQuery);
-          if (resolvedTitle) cleanQuery = resolvedTitle;
+          const resolved = await searchWikipediaTitle(strippedTopic) || await searchWikipediaTitle(cleanQuery);
+          if (resolved) cleanQuery = resolved;
         }
 
         const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(cleanQuery)}&format=json&origin=*`);
@@ -504,7 +509,7 @@
         }
       }
 
-      // 2. Comprehensive Wikipedia Intent Extractor (Catches "what are some", "what were the", etc.)
+      // 2. Comprehensive Wikipedia & Information Search Intent
       const wikiQueryMatch = clean.match(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i);
       const isGamesOrInfoQuery = /(?:launch games?|launch titles?|launch lineup|games for)\b/i.test(clean);
 
@@ -879,7 +884,7 @@
 
       // 23. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: dynamically lookup release dates and overviews on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
+        return `Here's what I can do: dynamically lookup console info and games on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
       }
 
       // 24. Identity
