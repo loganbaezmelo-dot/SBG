@@ -347,14 +347,20 @@
     // Client-side Wikipedia Fetcher with NLP Condensation
     async function fetchWikipediaSummary(query) {
       try {
-        const cleanQuery = encodeURIComponent(query.trim().replace(/\s+/g, '_'));
-        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${cleanQuery}`);
+        let cleanQuery = query.trim().replace(/\s+/g, '_');
+        // Console specific aliases
+        if (cleanQuery.toLowerCase() === 'wii_u' || cleanQuery.toLowerCase() === 'wiiu') cleanQuery = 'Wii_U';
+        if (cleanQuery.toLowerCase() === 'ps2') cleanQuery = 'PlayStation_2';
+        if (cleanQuery.toLowerCase() === 'ps3') cleanQuery = 'PlayStation_3';
+        if (cleanQuery.toLowerCase() === 'ps4') cleanQuery = 'PlayStation_4';
+        if (cleanQuery.toLowerCase() === 'ps5') cleanQuery = 'PlayStation_5';
+        
+        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`);
         if (!res.ok) return null;
         const data = await res.json();
         if (data.type === "disambiguation" || !data.extract) return null;
         
         let extract = data.extract;
-        // Clean citations and condense to 1-2 key sentences
         extract = extract.replace(/\[\d+\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
         const sentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
         const condensed = sentences.slice(0, 2).join(' ').trim();
@@ -429,11 +435,11 @@
         lastUserInput = clean;
       }
 
-      // 1. Wikipedia Direct Search Query Intent
-      const wikiQueryMatch = clean.match(/^(?:what is|what are|who is|who was|tell me about|explain|search wikipedia for|lookup)\s+(.+)/i);
+      // 1. Wikipedia Direct Query Intent (Expanded to catch "whats a", "what's a", "define", etc.)
+      const wikiQueryMatch = clean.match(/^(?:what(?:'s|s| is)?(?:\s+an?|\s+the)?|who(?:'s|s| is| was)?(?:\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define)\s+(.+)/i);
       if (wikiQueryMatch && wikiQueryMatch[1]) {
         const queryTerm = wikiQueryMatch[1].replace(/^(?:the|a|an)\s+/i, '').trim();
-        if (!stopWords.has(queryTerm) && queryTerm.length > 2) {
+        if (!stopWords.has(queryTerm) && queryTerm.length >= 2) {
           const wikiSummary = await fetchWikipediaSummary(queryTerm);
           if (wikiSummary) {
             return pickRandom([
@@ -446,7 +452,6 @@
       }
 
       // 2. Compound Sentence & Multi-Clause Intent Engine
-      // Checks for compound clauses joined by 'and', 'also', 'plus', 'but', 'then'
       const compoundSplit = rawInput.split(/\s+(?:and(?:\s+i)?|also(?:\s+i)?|plus(?:\s+i)?|then(?:\s+i)?|but(?:\s+i)?)\s+/i);
       if (compoundSplit.length >= 2) {
         const clause1 = compoundSplit[0].trim();
@@ -455,7 +460,6 @@
         const c1Console = extractConsole(clause1);
         const c1Feature = extractFeature(clause1);
         
-        // Check if clause 2 has an intent/activity/game (e.g. "wanna play Mario Kart", "mod my ps2")
         const actionMatch = clause2.match(/(?:wanna|want to|plan to|trying to|thinking of|gonna)\s+(?:play|load|mod|set up|run|get)\s+([^,?!.]+)/i) ||
                             clause2.match(/(?:play|run|launch|load)\s+([^,?!.]+)/i);
 
@@ -804,7 +808,7 @@
 
       // 22. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: handle compound sentences ('I have Aroma and want to play Mario Kart'), look up Wikipedia summaries ('what is GameCube?'), remember facts, track full chat history, chain features, and store state${nameTag}!`;
+        return `Here's what I can do: handle compound sentences ('I have Aroma and want to play Mario Kart'), look up Wikipedia summaries ('whats a wii u?'), remember facts, track full chat history, chain features, and store state${nameTag}!`;
       }
 
       // 23. Identity
