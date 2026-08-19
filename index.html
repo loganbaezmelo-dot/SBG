@@ -175,11 +175,16 @@
     const userInput = document.getElementById('user-input');
     
     let lastBotResponse = "";
-    let lastBotPrompt = "";
-    let currentTopic = ""; 
-    let activeFeature = ""; 
     let lastUserInput = "";
     let repeatCount = 0;
+
+    // Multi-level Intent & Context Stack Engine State
+    let contextStack = {
+      topic: null,           // e.g., "ps2", "wii u", "ps2 slim"
+      subTopic: null,        // e.g., "pretendo", "aroma", "freemcboot"
+      questionState: null,   // tracks active prompt/question waiting for an answer
+      sentiment: "neutral"   // "positive", "negative", "frustrated", "neutral"
+    };
 
     const typoMap = {
       "doimg": "doing",
@@ -287,14 +292,15 @@
         .trim();
     }
 
+    // Exact name extractor: matches only what the user says
     function extractConsole(sentence) {
-      const match = sentence.match(/\b(wii\s+u|wii|ps1|ps2|ps3|ps4|ps5|xbox\s+360|xbox\s+one|xbox|switch|3ds|ds|psp|ps\s*vita)\b/i);
-      return match ? match[1].toLowerCase().trim() : null;
+      const match = sentence.match(/\b(wii\s+u|wii|ps1\s+slim|ps1|ps2\s+slim(?:\s+[a-z0-9-]+)?|ps2|ps3\s+slim|ps3\s+super\s+slim|ps3|ps4\s+pro|ps4\s+slim|ps4|ps5\s+slim|ps5\s+pro|ps5|xbox\s+360\s+s|xbox\s+360\s+e|xbox\s+360|xbox\s+one\s+s|xbox\s+one\s+x|xbox\s+one|xbox\s+series\s+s|xbox\s+series\s+x|xbox|switch\s+oled|switch\s+lite|switch|new\s+3ds\s+xl|3ds\s+xl|2ds\s+xl|3ds|2ds|ds\s+lite|dsi\s+xl|dsi|ds|psp\s+go|psp|ps\s*vita)\b/i);
+      return match ? match[1].trim() : null;
     }
 
     function extractFeature(sentence) {
-      const match = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|homebrew|cfw|pretendo|loadiine|nintendont)\b/i);
-      return match ? match[1].toLowerCase().trim() : null;
+      const match = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|freemcboot|fmcb|open\s+ps2\s+loader|opl|mechapow|hen|cfw|homebrew|pretendo|loadiine|nintendont)\b/i);
+      return match ? match[1].trim() : null;
     }
 
     function extractSubject(sentence) {
@@ -333,6 +339,13 @@
       return null;
     }
 
+    function detectSentiment(text) {
+      if (/\b(fuck|shit|damn|crap|hell|wtf|hate|annoyed|broken|trash|pissed)\b/i.test(text)) return "frustrated";
+      if (/\b(great|awesome|love|cool|fire|nice|hyped|smooth|good|best)\b/i.test(text)) return "positive";
+      if (/\b(bad|awful|sad|unhappy|tired|bored|sucks)\b/i.test(text)) return "negative";
+      return "neutral";
+    }
+
     function appendMessage(text, sender) {
       const msg = document.createElement('div');
       msg.classList.add('message', sender);
@@ -348,10 +361,10 @@
 
       if (name) {
         appendMessage("Welcome back! Good to see you again. What's on your mind?", 'bot');
-        lastBotPrompt = "general_greeting";
+        contextStack.questionState = "general_greeting";
       } else {
         appendMessage("Hey! I'm SBG (Simulated But Good). What's your name?", 'bot');
-        lastBotPrompt = "ask_name";
+        contextStack.questionState = "ask_name";
       }
     }
 
@@ -368,14 +381,15 @@
       const nameTag = useNameTag ? `, ${firstName}` : "";
       
       let topicHistory = memory.get('history') || [];
-      const currentPrompt = lastBotPrompt;
-      lastBotPrompt = "";
+      const currentQuestionState = contextStack.questionState;
+      contextStack.questionState = null;
+      contextStack.sentiment = detectSentiment(rawLower);
 
       // 0. Repeat Loop Detection
       if (clean === lastUserInput) {
         repeatCount++;
         if (repeatCount === 1) {
-          lastBotPrompt = "echo_check";
+          contextStack.questionState = "echo_check";
           return pickRandom([
             `You just said that${nameTag}! Is there an echo in here?`,
             `Wait, didn't you just say that${nameTag}?`,
@@ -418,8 +432,8 @@
       }
 
       // 3. Swear words / Frustration / Outbursts
-      if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean)) {
-        lastBotPrompt = "ask_how_are_you";
+      if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
+        contextStack.questionState = "ask_how_are_you";
         return pickRandom([
           `Whoa, easy there${nameTag}! What happened?`,
           `Lmao what went wrong${nameTag}?`,
@@ -435,8 +449,10 @@
         const facts = memory.get('facts') || [];
         
         let storedFact = factText;
-        if ((factText === "wii u" || factText === "wiiu") && activeFeature) {
-          storedFact = `you have ${activeFeature} on your wii u`;
+        if (contextStack.topic && (factText === contextStack.topic.toLowerCase() || factText === "it")) {
+          storedFact = contextStack.subTopic 
+            ? `you have ${contextStack.subTopic} on your ${contextStack.topic}`
+            : `you have a ${contextStack.topic}`;
         }
         
         facts.push(storedFact);
@@ -469,7 +485,7 @@
 
       // 6. Status Return / "How are you doing" directed to bot
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
-        lastBotPrompt = "ask_activity";
+        contextStack.questionState = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
           return pickRandom([
             `Glad to hear you're doing great! I'm running smooth as ever${nameTag}. What are you up to today?`,
@@ -550,16 +566,16 @@
         ]);
       }
 
-      // 9. Detected Known Feature on Existing Topic
+      // 9. Detected Known Feature / Sub-Topic on Existing Context Stack
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
-        activeFeature = detectedFeature;
+        contextStack.subTopic = detectedFeature;
         if (!topicHistory.includes(detectedFeature)) {
           topicHistory.push(detectedFeature);
           memory.set('history', topicHistory);
         }
-        const target = currentTopic ? ` on the ${currentTopic}` : "";
-        lastBotPrompt = "ask_feature_details";
+        const target = contextStack.topic ? ` on the ${contextStack.topic}` : "";
+        contextStack.questionState = "ask_feature_details";
         
         return pickRandom([
           `Nice, running ${detectedFeature}${target} is solid${nameTag}! What kind of stuff do you do with it?`,
@@ -586,7 +602,7 @@
 
       // 11. Feature Details / Explanation Handler
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
-        lastBotPrompt = "ask_homebrew_apps";
+        contextStack.questionState = "ask_homebrew_apps";
         return pickRandom([
           `Having full system access is huge${nameTag}! What homebrew apps or plugins are you running on it?`,
           `That level of control is awesome! What's the first thing you installed after getting that access?`,
@@ -594,11 +610,11 @@
         ]);
       }
 
-      // 12. Vague Quantity / Activity Answers
+      // 12. Vague Quantity / Context-Stack Dependent Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
-        if (currentPrompt === "ask_feature_details") {
-          lastBotPrompt = "ask_specific_app";
-          const target = activeFeature ? `with ${activeFeature}` : "with it";
+        if (currentQuestionState === "ask_feature_details") {
+          contextStack.questionState = "ask_specific_app";
+          const target = contextStack.subTopic ? `with ${contextStack.subTopic}` : "with it";
           return pickRandom([
             `Nice! Like what specifically? Any favorite apps, mods, or games you run ${target}${nameTag}?`,
             `A lot is an understatement! What's the most notable thing you've set up ${target}?`,
@@ -615,7 +631,7 @@
 
       // 13. Negative Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
-        if (currentPrompt === "echo_check") {
+        if (currentQuestionState === "echo_check") {
           return pickRandom([
             `Thought so${nameTag} 😂 So what were you actually trying to say?`,
             `Haha fair enough! What's on your mind then?`
@@ -631,7 +647,7 @@
 
       // 14. Positive Status / Agreements (Stand-alone)
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
-        if (currentPrompt === "general_greeting" || currentPrompt === "ask_how_are_you") {
+        if (currentQuestionState === "general_greeting" || currentQuestionState === "ask_how_are_you") {
           return pickRandom([
             `Glad to hear that${nameTag}! What are you working on today?`,
             `Awesome${nameTag}. What's next on the agenda?`,
@@ -639,7 +655,7 @@
             `Love to hear it! Got any cool projects lined up?`
           ]);
         } else {
-          lastBotPrompt = "ask_activity";
+          contextStack.questionState = "ask_activity";
           return pickRandom([
             `100%${nameTag}. What are you up to right now?`,
             `Facts${nameTag}. What are you up to right now?`,
@@ -649,14 +665,14 @@
         }
       }
 
-      // 15. Explanations / Reasons referencing active topic
-      if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentPrompt === "ask_why_topic" && clean.includes("cool"))) {
-        if (currentTopic) {
-          lastBotPrompt = "ask_favorite_feature";
+      // 15. Explanations / Reasons referencing active context topic
+      if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
+        if (contextStack.topic) {
+          contextStack.questionState = "ask_favorite_feature";
           return pickRandom([
-            `Valid reason! What's your favorite thing about the ${currentTopic}${nameTag}?`,
-            `Makes total sense! What do you like most about the ${currentTopic}?`,
-            `That's definitely a solid point! How often do you use the ${currentTopic}${nameTag}?`
+            `Valid reason! What's your favorite thing about the ${contextStack.topic}${nameTag}?`,
+            `Makes total sense! What do you like most about the ${contextStack.topic}?`,
+            `That's definitely a solid point! How often do you use the ${contextStack.topic}${nameTag}?`
           ]);
         } else {
           return pickRandom([
@@ -694,7 +710,7 @@
         }
       }
 
-      if ((!fullName || currentPrompt === "ask_name") && rawInput.split(" ").length <= 3 && rawInput.length > 1 && !stopWords.has(clean) && !isActivityPhrase) {
+      if ((!fullName || currentQuestionState === "ask_name") && rawInput.split(" ").length <= 3 && rawInput.length > 1 && !stopWords.has(clean) && !isActivityPhrase) {
         const parsedName = formatName(rawInput);
         memory.set('userName', parsedName);
         return pickRandom([
@@ -705,7 +721,7 @@
       }
 
       // 18. Negative Status
-      if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean)) {
+      if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean) || contextStack.sentiment === "negative") {
         return pickRandom([
           `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
           `Ah that's rough${nameTag}. Anything specific causing the headache?`,
@@ -713,7 +729,7 @@
         ]);
       }
 
-      // 19. Natural Short Acknowledgements (Fixed: no more assuming a plan)
+      // 19. Natural Short Acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
           `Gotcha! What's next on your mind${nameTag}?`,
@@ -739,7 +755,7 @@
 
       // 22. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
-        lastBotPrompt = "ask_how_are_you";
+        contextStack.questionState = "ask_how_are_you";
         return pickRandom([
           `Hello there! How's your day going${nameTag}?`,
           `Yo! How are you doing today${nameTag}?`,
@@ -758,26 +774,29 @@
         ]);
       }
 
-      // 24. Context-Aware Subject Extraction & Topic Management
-      const extractedSubject = extractSubject(rawLower);
+      // 24. Multi-level Context Stack: Subject & Console Extraction
+      const extractedSubject = extractSubject(rawInput);
       if (extractedSubject && extractedSubject.length > 1) {
-        const isExistingTopic = currentTopic === extractedSubject;
-        currentTopic = extractedSubject;
+        const isExistingTopic = contextStack.topic && contextStack.topic.toLowerCase() === extractedSubject.toLowerCase();
+        
+        // Exact name preservation: preserves what was stated
+        contextStack.topic = extractedSubject;
         
         if (!topicHistory.includes(extractedSubject)) {
           topicHistory.push(extractedSubject);
           memory.set('history', topicHistory);
         }
 
-        if (isExistingTopic && activeFeature) {
+        // Active Context Re-entry check
+        if (isExistingTopic && contextStack.subTopic) {
           return pickRandom([
-            `Right, we were talking about your ${extractedSubject} with ${activeFeature}! What else are you running on it${nameTag}?`,
-            `Yep, still on the ${extractedSubject} setup with ${activeFeature}. Anything new you've added?`,
-            `Got the ${extractedSubject} running ${activeFeature} in focus! What's next on that?`
+            `Right, we were talking about your ${extractedSubject} with ${contextStack.subTopic}! What else are you running on it${nameTag}?`,
+            `Yep, still on the ${extractedSubject} setup with ${contextStack.subTopic}. Anything new you've added?`,
+            `Got the ${extractedSubject} running ${contextStack.subTopic} in focus! What's next on that?`
           ]);
         }
 
-        lastBotPrompt = "ask_why_topic";
+        contextStack.questionState = "ask_why_topic";
         return pickRandom([
           `What got you interested in ${extractedSubject}${nameTag}?`,
           `What about ${extractedSubject} are you thinking about${nameTag}?`,
@@ -794,7 +813,7 @@
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 26. Clean Natural Fallbacks (No duplicates)
+      // 26. Fallback Prompts
       return pickRandom([
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
@@ -824,10 +843,13 @@
       memory.clear();
       messagesContainer.innerHTML = '';
       appendMessage("Memory wiped clean. Who are you again?", 'bot');
-      lastBotPrompt = "ask_name";
+      contextStack = {
+        topic: null,
+        subTopic: null,
+        questionState: "ask_name",
+        sentiment: "neutral"
+      };
       lastUserInput = "";
-      currentTopic = "";
-      activeFeature = "";
       repeatCount = 0;
       lastBotResponse = "";
     }
