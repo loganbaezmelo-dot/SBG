@@ -344,7 +344,7 @@
       return "neutral";
     }
 
-    // Client-side Wikipedia Fetcher with Smart Descriptive Sentence Matching
+    // Client-side Wikipedia Fetcher with Semantic Feature Extraction
     async function fetchWikipediaSummary(query) {
       try {
         let cleanQuery = query.trim().replace(/\s+/g, '_');
@@ -364,30 +364,37 @@
         let extract = data.extract;
         extract = extract.replace(/\[\d+\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
         
-        // Clean multi-region date dumps down to the primary launch year
+        // Clean multi-region date dumps
         extract = extract.replace(/released in Japan on [^,]+, in North America on [^,]+, and in Europe on [^.]+/i, (match) => {
           const year = match.match(/\b(19\d\d|20\d\d)\b/);
           return year ? `originally released in ${year[0]}` : "released worldwide";
         });
         
-        const allSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
-        const selected = [allSentences[0].trim()];
+        // Split on sentences and semicolons to isolate clauses cleanly
+        const rawClauses = extract.split(/(?<=[.!?])\s+|;\s+/g).map(s => s.trim()).filter(s => s.length > 0);
         
-        // Look for the descriptive feature sentence across the paragraph
-        let foundFeature = false;
-        for (let i = 1; i < allSentences.length; i++) {
-          const s = allSentences[i].trim();
-          const isFiller = /\b(?:competed with|competes with|generation of|succeeded the|preceded by)\b/i.test(s);
+        let firstSentence = rawClauses[0];
+        if (!/[.!?]$/.test(firstSentence)) firstSentence += '.';
+        const selected = [firstSentence];
+        
+        // Prioritize actual feature/hardware descriptive sentences
+        let featureSentence = null;
+        for (let i = 1; i < rawClauses.length; i++) {
+          const clause = rawClauses[i];
+          const isCompetitorOrGen = /\b(?:competed with|competes with|generation of|succeeded the|preceded by|successor to)\b/i.test(clause);
+          const isFeatureRich = /\b(?:hybrid|tablet|dock|docked|portable|handheld|controller|joy-con|disc|cartridge|features|device|features a|designed to)\b/i.test(clause);
           
-          if (!isFiller) {
-            selected.push(s);
-            foundFeature = true;
+          if (isFeatureRich) {
+            featureSentence = clause;
             break;
+          } else if (!isCompetitorOrGen && !featureSentence) {
+            featureSentence = clause;
           }
         }
         
-        if (!foundFeature && allSentences.length > 1) {
-          selected.push(allSentences[1].trim());
+        if (featureSentence) {
+          if (!/[.!?]$/.test(featureSentence)) featureSentence += '.';
+          selected.push(featureSentence);
         }
         
         const condensed = selected.join(' ').trim();
