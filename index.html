@@ -248,7 +248,7 @@
     const stopWords = new Set([
       "i", "me", "my", "myself", "we", "our", "you", "your", "he", "she", "it", "they",
       "wanna", "want", "do", "doing", "done", "did", "does", "some", "like", "love", "hate", "play", "make", "get", "go",
-      "have", "has", "had", "can", "could", "should", "would", "is", "are", "was", "were",
+      "have", "has", "had", "can", "could", "should", "would", "is", "are", "was", "were", "if",
       "a", "an", "the", "this", "that", "these", "those", "to", "for", "with", "about",
       "of", "at", "in", "on", "by", "from", "up", "down", "out", "over", "under", "again",
       "then", "once", "here", "there", "when", "where", "why", "how", "all", "any",
@@ -258,8 +258,9 @@
       "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye",
       "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus",
       "earlier", "before", "talking", "talked", "mention", "mentioned", "wait", "covered", "discussed",
-      "stuff", "things", "lot", "lots", "bunch", "everything", "anything",
+      "stuff", "things", "lot", "lots", "bunch", "everything", "anything", "something",
       "use", "using", "uses", "gives", "giving", "gave", "got", "give", "access", "part", "coolest", "best",
+      "know", "knowing", "knows", "knew", "think", "thinking", "thinks", "thought", "troubling", "trouble", "matter", "mattered",
       "fuck", "shit", "damn", "crap", "hell", "bruh", "wtf", "lmao", "lol"
     ]);
 
@@ -403,7 +404,22 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Detected Known Feature on Existing Topic
+      // 4. Therapeutic / Eliza-Style Question Handling
+      if (/^is something (?:troubling|wrong|bothering)/i.test(clean)) {
+        return `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`;
+      }
+      if (/^what if (?:i|you) were thinking/i.test(clean) || /^what if\b/i.test(clean)) {
+        return `Hypotheticals are always interesting${nameTag}! What led you to that thought?`;
+      }
+      if (/^what do you know about/i.test(clean)) {
+        const query = clean.replace(/^what do you know about\s+/i, '');
+        return `I know whatever you teach me about ${query || "it"}${nameTag}! Want to give me the details?`;
+      }
+      if (/^would it matter (?:to you)?/i.test(clean)) {
+        return `Of course it matters${nameTag}! I'm here to follow the thread.`;
+      }
+
+      // 5. Detected Known Feature on Existing Topic
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         activeFeature = detectedFeature;
@@ -416,20 +432,20 @@
         return `Nice, running ${detectedFeature}${target} is solid${nameTag}! What kind of stuff do you do with it?`;
       }
 
-      // 5. Activity Updates / "Up to doing stuff" Handler
+      // 6. Activity Updates / "Up to doing stuff" Handler
       if (/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling|working on)\s+(.*)/i.test(clean)) {
         const activityMatch = clean.match(/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling|working on)\s+(.*)/i);
         const act = activityMatch && activityMatch[1] ? activityMatch[1].trim() : "that";
         return `Nice, getting into ${act} sounds productive${nameTag}! What are you tackling first?`;
       }
 
-      // 6. Feature Details / Explanation Handler
+      // 7. Feature Details / Explanation Handler
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         lastBotPrompt = "ask_homebrew_apps";
         return `Having full system access is huge${nameTag}! What homebrew apps or plugins are you running on it?`;
       }
 
-      // 7. Vague Quantity / Activity Answers
+      // 8. Vague Quantity / Activity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentPrompt === "ask_feature_details") {
           lastBotPrompt = "ask_specific_app";
@@ -440,7 +456,7 @@
         }
       }
 
-      // 8. Negative Disagreements
+      // 9. Negative Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentPrompt === "echo_check") {
           return `Thought so${nameTag} 😂 So what were you actually trying to say?`;
@@ -453,7 +469,7 @@
         return noReplies[Math.floor(Math.random() * noReplies.length)];
       }
 
-      // 9. Positive Status / Agreements
+      // 10. Positive Status / Agreements
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentPrompt === "general_greeting" || currentPrompt === "ask_how_are_you") {
           const replies = [
@@ -473,7 +489,7 @@
         }
       }
 
-      // 10. Explanations / Reasons referencing active topic
+      // 11. Explanations / Reasons referencing active topic
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentPrompt === "ask_why_topic" && clean.includes("cool"))) {
         if (currentTopic) {
           lastBotPrompt = "ask_favorite_feature";
@@ -483,12 +499,12 @@
         }
       }
 
-      // 11. Asking about name recall
+      // 12. Asking about name recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName ? `Your name is ${fullName}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 12. Strict Name Extraction (Guarded against action phrases)
+      // 13. Strict Name Extraction
       const isActivityPhrase = /^(?:up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
@@ -507,22 +523,22 @@
         return `Nice to meet you, ${parsedName}! I've logged that in my memory.`;
       }
 
-      // 13. Negative Status
+      // 14. Negative Status
       if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean)) {
         return `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`;
       }
 
-      // 14. Capabilities / Help
+      // 15. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
-      // 15. Identity of SBG
+      // 16. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`;
       }
 
-      // 16. Short acknowledgements
+      // 17. Short acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         const acks = [
           `Yep${nameTag}!`,
@@ -534,7 +550,7 @@
         return acks[Math.floor(Math.random() * acks.length)];
       }
 
-      // 17. Greetings
+      // 18. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         lastBotPrompt = "ask_how_are_you";
         const greetings = [
@@ -545,19 +561,19 @@
         return greetings[Math.floor(Math.random() * greetings.length)];
       }
 
-      // 18. Status question directed to bot
+      // 19. Status question directed to bot
       if (clean.includes("how are you") || clean.includes("how r u")) {
         lastBotPrompt = "ask_how_are_you";
         return `Running smoothly in your browser cache! How about yourself${nameTag}?`;
       }
 
-      // 19. Feelings
+      // 20. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         return `Why do you feel ${feelMatch[1]}? Does that happen often${nameTag}?`;
       }
 
-      // 20. Memory Factoid System
+      // 21. Memory Factoid System
       const rememberMatch = clean.match(/remember that (.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const facts = memory.get('facts') || [];
@@ -575,7 +591,7 @@
         return info.join(". ") + ".";
       }
 
-      // 21. Intelligent Subject Extraction with Persistent History Logging
+      // 22. Intelligent Subject Extraction with Persistent History Logging
       const extractedSubject = extractSubject(rawLower);
       if (extractedSubject && extractedSubject.length > 1) {
         currentTopic = extractedSubject;
@@ -587,22 +603,22 @@
         
         const titleCaseSubject = extractedSubject.charAt(0).toUpperCase() + extractedSubject.slice(1);
         const subjectQuestions = [
-          `What got you interested in the ${extractedSubject}${nameTag}?`,
-          `What about the ${extractedSubject} are you thinking about${nameTag}?`,
-          `What do you want to do with the ${extractedSubject}${nameTag}?`,
-          `Tell me more about your ${extractedSubject}${nameTag}!`
+          `What got you interested in ${extractedSubject}${nameTag}?`,
+          `What about ${extractedSubject} are you thinking about${nameTag}?`,
+          `What do you want to do with ${extractedSubject}${nameTag}?`,
+          `Tell me more about ${extractedSubject}${nameTag}!`
         ];
         return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
       }
 
-      // 22. Context Anchors from Past Memories
+      // 23. Context Anchors from Past Memories
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 23. Clean Natural Fallbacks
+      // 24. Clean Natural Fallbacks
       const fallbacks = [
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
