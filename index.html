@@ -713,28 +713,27 @@
         ]);
       }
 
-      // 19. Capabilities / Help
+      // 19. Open-Ended Short Acknowledgements (Fixed dead-end "Cool cool")
+      if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
+        return pickRandom([
+          `Cool cool! What's next on your mind${nameTag}?`,
+          `Sounds like a plan! What are we tackling next${nameTag}?`,
+          `Gotcha! What are you working on right now${nameTag}?`,
+          `Bet! What's the next move${nameTag}?`,
+          `For sure! What else is happening today${nameTag}?`
+        ]);
+      }
+
+      // 20. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
-      // 20. Identity of SBG
+      // 21. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
           `I'm SBG! A client-side, regex-powered conversational engine built to remember context${nameTag}.`
-        ]);
-      }
-
-      // 21. Short acknowledgements
-      if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
-        return pickRandom([
-          `Yep${nameTag}!`,
-          `Sounds good${nameTag}.`,
-          `Gotcha${nameTag}.`,
-          `For sure${nameTag}.`,
-          `Cool cool${nameTag}.`,
-          `Bet${nameTag}!`
         ]);
       }
 
