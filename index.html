@@ -229,7 +229,7 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking"];
 
     function normalizeText(text) {
       return text.toLowerCase().split(/\s+/).map(word => {
@@ -321,7 +321,7 @@
 
     function generateResponse(input) {
       const normalized = normalizeText(input);
-      const clean = normalized.toLowerCase().trim();
+      const clean = normalized.toLowerCase().replace(/[?!.,]/g, '').trim();
       const rawInput = input.trim();
       
       let fullName = memory.get('userName');
@@ -349,32 +349,32 @@
         lastUserInput = clean;
       }
 
-      // 1. Single-letter / Keyboard Mash Ignore
+      // 1. History & Conversation Recall (Robust Matching)
+      if (/(?:what (?:was i|were we) (?:talking|saying) about|what did (?:i|we) (?:say|talk about)|recap|earlier|before)/i.test(clean) || clean === "what were we talking about" || clean === "what was i talking about") {
+        if (topicHistory.length === 0) {
+          return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
+        } else if (topicHistory.length === 1) {
+          return `Earlier you were talking about the ${topicHistory[0]}${nameTag}!`;
+        } else {
+          const pastList = [...new Set(topicHistory)].join(", ");
+          return `Earlier in this chat, we covered: ${pastList}${nameTag}!`;
+        }
+      }
+
+      // 2. Single-letter / Keyboard Mash Ignore
       if (clean.length <= 1) {
         return `Just one letter? Type out a word${nameTag}!`;
       }
 
-      // 2. Swear words / Frustration / Outbursts
+      // 3. Swear words / Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean)) {
-        lastBotPrompt = "ask_how_are_you"; // Sets state so followups like "doing great" connect!
+        lastBotPrompt = "ask_how_are_you";
         const curseReplies = [
           `Whoa, easy there${nameTag}! What happened?`,
           `Lmao what went wrong${nameTag}?`,
           `No need for hostility 😭 What's up?`
         ];
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
-      }
-
-      // 3. History & Conversation Recall
-      if (/(?:what (?:was i|were we) talking about|what did (?:i|we) (?:say|talk about)|recap|earlier|before)/i.test(clean)) {
-        if (topicHistory.length === 0) {
-          return `We haven't brought up specific topics yet${nameTag}! What's on your mind?`;
-        } else if (topicHistory.length === 1) {
-          return `Earlier you were talking about ${topicHistory[0]}${nameTag}!`;
-        } else {
-          const pastList = [...new Set(topicHistory)].join(", ");
-          return `Earlier in this chat, we covered: ${pastList}${nameTag}!`;
-        }
       }
 
       // 4. Negative Disagreements
@@ -390,7 +390,7 @@
         return noReplies[Math.floor(Math.random() * noReplies.length)];
       }
 
-      // 5. Positive Status / Agreements (Catches "doing great", "doing good", etc.)
+      // 5. Positive Status / Agreements
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentPrompt === "general_greeting" || currentPrompt === "ask_how_are_you") {
           const replies = [
