@@ -178,12 +178,11 @@
     let lastUserInput = "";
     let repeatCount = 0;
 
-    // Multi-level Intent & Context Stack Engine State
     let contextStack = {
-      topic: null,           // e.g., "ps2", "wii u", "ps2 slim"
-      subTopic: null,        // e.g., "pretendo", "aroma", "freemcboot"
-      questionState: null,   // tracks active prompt/question waiting for an answer
-      sentiment: "neutral"   // "positive", "negative", "frustrated", "neutral"
+      topic: null,
+      subTopic: null,
+      questionState: null,
+      sentiment: "neutral"
     };
 
     const typoMap = {
@@ -292,7 +291,6 @@
         .trim();
     }
 
-    // Exact name extractor: matches only what the user says
     function extractConsole(sentence) {
       const match = sentence.match(/\b(wii\s+u|wii|ps1\s+slim|ps1|ps2\s+slim(?:\s+[a-z0-9-]+)?|ps2|ps3\s+slim|ps3\s+super\s+slim|ps3|ps4\s+pro|ps4\s+slim|ps4|ps5\s+slim|ps5\s+pro|ps5|xbox\s+360\s+s|xbox\s+360\s+e|xbox\s+360|xbox\s+one\s+s|xbox\s+one\s+x|xbox\s+one|xbox\s+series\s+s|xbox\s+series\s+x|xbox|switch\s+oled|switch\s+lite|switch|new\s+3ds\s+xl|3ds\s+xl|2ds\s+xl|3ds|2ds|ds\s+lite|dsi\s+xl|dsi|ds|psp\s+go|psp|ps\s*vita)\b/i);
       return match ? match[1].trim() : null;
@@ -381,6 +379,8 @@
       const nameTag = useNameTag ? `, ${firstName}` : "";
       
       let topicHistory = memory.get('history') || [];
+      let consoleMap = memory.get('consoleMap') || {};
+      
       const currentQuestionState = contextStack.questionState;
       contextStack.questionState = null;
       contextStack.sentiment = detectSentiment(rawLower);
@@ -422,7 +422,7 @@
         }
       }
 
-      // 2. Single-letter / Keyboard Mash Ignore
+      // 2. Single-letter Ignore
       if (clean.length <= 1) {
         return pickRandom([
           `Just one letter? Type out a word${nameTag}!`,
@@ -431,7 +431,7 @@
         ]);
       }
 
-      // 3. Swear words / Frustration / Outbursts
+      // 3. Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -474,7 +474,7 @@
         return info.join(". ") + ".";
       }
 
-      // 5. Directional / Positional Echos ("Your end?", "My side?")
+      // 5. Directional Echos
       if (/^(?:your|my)\s+(?:end|side)\b/i.test(clean)) {
         return pickRandom([
           `Just everything on my side! Code, memory, and logic are running smooth${nameTag}.`,
@@ -483,7 +483,7 @@
         ]);
       }
 
-      // 6. Status Return / "How are you doing" directed to bot
+      // 6. Status Return
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
         contextStack.questionState = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
@@ -500,7 +500,7 @@
         ]);
       }
 
-      // 7. Positive Acknowledgements / Status
+      // 7. Positive Acknowledgements
       if (/^(?:that(?:'s|s)?|it(?:'s|s)?|sounds?)\s+(?:good|great|cool|awesome|dope|nice|solid|valid|fair)\b/i.test(clean)) {
         return pickRandom([
           `Glad to hear it${nameTag}! What's next on your mind?`,
@@ -511,7 +511,7 @@
         ]);
       }
 
-      // 8. Inquiries / Deflections / Therapeutic Patterns
+      // 8. Inquiries & Deflections
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return pickRandom([
           `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`,
@@ -566,7 +566,7 @@
         ]);
       }
 
-      // 9. Detected Known Feature / Sub-Topic on Existing Context Stack
+      // 9. Detected Feature / Sub-Topic on Active Context
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         contextStack.subTopic = detectedFeature;
@@ -574,6 +574,17 @@
           topicHistory.push(detectedFeature);
           memory.set('history', topicHistory);
         }
+
+        // Link feature to the active console topic in persistent map
+        if (contextStack.topic) {
+          const cKey = contextStack.topic.toLowerCase();
+          consoleMap[cKey] = consoleMap[cKey] || [];
+          if (!consoleMap[cKey].includes(detectedFeature)) {
+            consoleMap[cKey].push(detectedFeature);
+            memory.set('consoleMap', consoleMap);
+          }
+        }
+
         const target = contextStack.topic ? ` on the ${contextStack.topic}` : "";
         contextStack.questionState = "ask_feature_details";
         
@@ -600,7 +611,7 @@
         }
       }
 
-      // 11. Feature Details / Explanation Handler
+      // 11. Feature Details
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         contextStack.questionState = "ask_homebrew_apps";
         return pickRandom([
@@ -610,7 +621,7 @@
         ]);
       }
 
-      // 12. Vague Quantity / Context-Stack Dependent Answers
+      // 12. Vague Quantity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentQuestionState === "ask_feature_details") {
           contextStack.questionState = "ask_specific_app";
@@ -629,7 +640,7 @@
         }
       }
 
-      // 13. Negative Disagreements
+      // 13. Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentQuestionState === "echo_check") {
           return pickRandom([
@@ -645,7 +656,7 @@
         ]);
       }
 
-      // 14. Positive Status / Agreements (Stand-alone)
+      // 14. Positive Status
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentQuestionState === "general_greeting" || currentQuestionState === "ask_how_are_you") {
           return pickRandom([
@@ -665,7 +676,7 @@
         }
       }
 
-      // 15. Explanations / Reasons referencing active context topic
+      // 15. Topic Reasons
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
         if (contextStack.topic) {
           contextStack.questionState = "ask_favorite_feature";
@@ -682,7 +693,7 @@
         }
       }
 
-      // 16. Asking about name recall
+      // 16. Name Recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName 
           ? pickRandom([
@@ -693,7 +704,7 @@
           : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 17. Strict Name Extraction
+      // 17. Name Extraction
       const isActivityPhrase = /^(?:up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
@@ -740,12 +751,12 @@
         ]);
       }
 
-      // 20. Capabilities / Help
+      // 20. Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
-      // 21. Identity of SBG
+      // 21. Identity
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
@@ -774,21 +785,24 @@
         ]);
       }
 
-      // 24. Multi-level Context Stack: Subject & Console Extraction
+      // 24. Context Stack Engine: Topic Switching & Session Revisit
       const extractedSubject = extractSubject(rawInput);
       if (extractedSubject && extractedSubject.length > 1) {
-        const isExistingTopic = contextStack.topic && contextStack.topic.toLowerCase() === extractedSubject.toLowerCase();
-        
-        // Exact name preservation: preserves what was stated
+        const subKey = extractedSubject.toLowerCase();
+        const isImmediateTopic = contextStack.topic && contextStack.topic.toLowerCase() === subKey;
+        const previouslyDiscussed = topicHistory.some(t => t.toLowerCase() === subKey);
+        const linkedFeatures = consoleMap[subKey] || [];
+
         contextStack.topic = extractedSubject;
-        
+        contextStack.subTopic = linkedFeatures.length > 0 ? linkedFeatures[linkedFeatures.length - 1] : null;
+
         if (!topicHistory.includes(extractedSubject)) {
           topicHistory.push(extractedSubject);
           memory.set('history', topicHistory);
         }
 
-        // Active Context Re-entry check
-        if (isExistingTopic && contextStack.subTopic) {
+        // 1. Immediate repeat turn with active sub-feature
+        if (isImmediateTopic && contextStack.subTopic) {
           return pickRandom([
             `Right, we were talking about your ${extractedSubject} with ${contextStack.subTopic}! What else are you running on it${nameTag}?`,
             `Yep, still on the ${extractedSubject} setup with ${contextStack.subTopic}. Anything new you've added?`,
@@ -796,6 +810,26 @@
           ]);
         }
 
+        // 2. Revisit a topic from earlier in the chat with known linked features
+        if (previouslyDiscussed && linkedFeatures.length > 0) {
+          const featureList = linkedFeatures.join(" & ");
+          return pickRandom([
+            `Back to the ${extractedSubject}! Are we still working with ${featureList}, or doing something new${nameTag}?`,
+            `Returning to the ${extractedSubject} setup with ${featureList}! What's the latest with it?`,
+            `Ah, circling back to the ${extractedSubject}! Any updates on the ${featureList} side${nameTag}?`
+          ]);
+        }
+
+        // 3. Revisit a topic discussed earlier without specific features logged yet
+        if (previouslyDiscussed) {
+          return pickRandom([
+            `Back to the ${extractedSubject}! What's on your mind about it now${nameTag}?`,
+            `Returning to ${extractedSubject}! What are we working on with it?`,
+            `Circling back to the ${extractedSubject}! What's next for it${nameTag}?`
+          ]);
+        }
+
+        // 4. First time mentioning this topic
         contextStack.questionState = "ask_why_topic";
         return pickRandom([
           `What got you interested in ${extractedSubject}${nameTag}?`,
@@ -806,14 +840,14 @@
         ]);
       }
 
-      // 25. Context Anchors from Past Memories
+      // 25. Memory Anchors
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 26. Fallback Prompts
+      // 26. Clean Fallbacks
       return pickRandom([
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
