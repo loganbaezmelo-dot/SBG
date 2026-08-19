@@ -247,7 +247,7 @@
 
     const stopWords = new Set([
       "i", "me", "my", "myself", "we", "our", "you", "your", "he", "she", "it", "they",
-      "wanna", "want", "do", "doing", "some", "like", "love", "hate", "play", "make", "get", "go",
+      "wanna", "want", "do", "doing", "done", "did", "does", "some", "like", "love", "hate", "play", "make", "get", "go",
       "have", "has", "had", "can", "could", "should", "would", "is", "are", "was", "were",
       "a", "an", "the", "this", "that", "these", "those", "to", "for", "with", "about",
       "of", "at", "in", "on", "by", "from", "up", "down", "out", "over", "under", "again",
@@ -257,7 +257,7 @@
       "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
       "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye",
       "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus",
-      "earlier", "before", "talking", "talked", "mention", "mentioned", "wait",
+      "earlier", "before", "talking", "talked", "mention", "mentioned", "wait", "covered", "discussed",
       "stuff", "things", "lot", "lots", "bunch", "everything", "anything",
       "use", "using", "uses", "gives", "giving", "gave", "got", "give", "access", "part", "coolest", "best",
       "fuck", "shit", "damn", "crap", "hell", "bruh", "wtf", "lmao", "lol"
@@ -314,7 +314,7 @@
       if (cleanTokens.length > 0 && cleanTokens.length <= 3) {
         const candidate = cleanTokens.join(" ");
         const cleaned = cleanSubjectText(candidate);
-        if (cleaned.length > 1) return cleaned;
+        if (cleaned.length > 1 && !stopWords.has(cleaned.toLowerCase())) return cleaned;
       }
 
       return null;
@@ -374,8 +374,8 @@
         lastUserInput = clean;
       }
 
-      // 1. History & Conversation Recall (Catches "what have we talked about", "what was i doing", etc.)
-      const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|talking about|talked about|talk about|saying|said)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
+      // 1. History & Conversation Recall (Expanded with "done", "discussed", "covered")
+      const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|done|talking about|talked about|talk about|saying|said|discussed|covered)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
