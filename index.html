@@ -373,7 +373,7 @@
         if (/^switch\s*2$/i.test(cleanName)) cleanName = "Nintendo Switch 2";
         if (/^wii\s*u$/i.test(cleanName)) cleanName = "Wii U";
 
-        // Tier 1: Search Wikipedia Category for Launch Titles
+        // Tier 1: Search Wikipedia Categories
         const catRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(cleanName.replace(/\s+/g, '_'))}_launch_titles&cmlimit=10&format=json&origin=*`);
         if (catRes.ok) {
           const catData = await catRes.json();
