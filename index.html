@@ -174,8 +174,11 @@
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     
+    // Conversation State Context
     let lastFallback = "";
     let lastBotPrompt = "";
+    let lastUserInput = "";
+    let repeatCount = 0;
 
     const stopWords = new Set([
       "i", "me", "my", "myself", "we", "our", "you", "your", "he", "she", "it", "they",
@@ -254,12 +257,27 @@
       const currentPrompt = lastBotPrompt;
       lastBotPrompt = "";
 
+      // 0. Repeat Loop Detection
+      if (clean === lastUserInput) {
+        repeatCount++;
+        if (repeatCount === 1) {
+          return `You just said that${nameTag}! Is there an echo in here?`;
+        } else if (repeatCount === 2) {
+          return `Saying "${input.trim()}" again won't change my logic${nameTag} 😭`;
+        } else {
+          return `Alright, you've said that ${repeatCount + 1} times now. Moving on!`;
+        }
+      } else {
+        repeatCount = 0;
+        lastUserInput = clean;
+      }
+
       // 1. Asking about name recall (Replies with full name)
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName ? `Your name is ${fullName}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 2. Name Extraction / Learning (Supports full multi-word names)
+      // 2. Name Extraction / Learning
       const nameMatch = rawInput.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)/i);
       if (nameMatch && nameMatch[1]) {
         const parsedName = formatName(nameMatch[1]);
@@ -414,6 +432,8 @@
       messagesContainer.innerHTML = '';
       appendMessage("Memory wiped clean. Who are you again?", 'bot');
       lastBotPrompt = "ask_name";
+      lastUserInput = "";
+      repeatCount = 0;
     }
 
     initBot();
