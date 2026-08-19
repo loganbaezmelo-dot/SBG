@@ -357,6 +357,7 @@
       return "neutral";
     }
 
+    // Pure Wikipedia Lead Fetcher with Clean Regex Filtering
     async function fetchWikipediaSummary(query) {
       try {
         let cleanQuery = query.trim().replace(/\s+/g, '_');
@@ -368,37 +369,40 @@
         if (cleanQuery.toLowerCase() === 'gamecube') cleanQuery = 'GameCube';
         if (cleanQuery.toLowerCase() === 'nintendo_switch' || cleanQuery.toLowerCase() === 'switch') cleanQuery = 'Nintendo_Switch';
         
-        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`);
+        // Fetch direct intro extract from Wikipedia
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(cleanQuery)}&format=json&origin=*`);
         if (!res.ok) return null;
         const data = await res.json();
-        if (data.type === "disambiguation" || !data.extract) return null;
+        const pages = data.query && data.query.pages;
+        if (!pages) return null;
         
-        let extract = data.extract;
+        const pageId = Object.keys(pages)[0];
+        if (pageId === "-1" || !pages[pageId].extract) return null;
+        
+        let extract = pages[pageId].extract;
         extract = extract.replace(/\[\d+\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
         
-        // Clean multi-region date dumps
+        // Filter out multi-region date dumps
         extract = extract.replace(/released in Japan on [^,]+, in North America on [^,]+, and in Europe on [^.]+/i, (match) => {
           const year = match.match(/\b(19\d\d|20\d\d)\b/);
           return year ? `originally released in ${year[0]}` : "released worldwide";
         });
+
+        // Split text into real standalone sentences
+        const rawSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
+        const cleanedSentences = [];
         
-        // Split on sentences cleanly
-        const sentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
-        
-        let lead = sentences[0].trim();
-        let followUp = "";
-        
-        if (sentences.length > 1) {
-          // If sentence 2 is a generation/rivals list, clean it up or pick sentence 3
-          let candidate = sentences[1].trim();
-          if (/\b(?:competed with|competes with|generation of)\b/i.test(candidate) && sentences.length > 2) {
-            followUp = sentences[2].trim();
-          } else {
-            followUp = candidate;
+        for (let s of rawSentences) {
+          let str = s.trim();
+          // Remove rivalry/generation filler sentences
+          if (/\b(?:generation of home consoles|competed with|competes with|ninth-generation|eighth-generation|succeeded the wii u and competed)\b/i.test(str)) {
+            continue;
           }
+          cleanedSentences.push(str);
         }
-        
-        const result = [lead, followUp].filter(Boolean).join(' ').trim();
+
+        const picked = cleanedSentences.length >= 2 ? cleanedSentences.slice(0, 2) : rawSentences.slice(0, 2);
+        const result = picked.join(' ').trim();
         return result.length > 15 ? result : null;
       } catch (err) {
         return null;
