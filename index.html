@@ -344,7 +344,7 @@
       return "neutral";
     }
 
-    // Dynamic Wikipedia Title Search
+    // Dynamic Wikipedia OpenSearch API Resolver
     async function searchWikipediaTitle(query) {
       try {
         const res = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&namespace=0&format=json&origin=*`);
@@ -356,17 +356,17 @@
       }
     }
 
-    // Pure Wikipedia Lead Fetcher with Dynamic Fallback Search
+    // Pure Dynamic Wikipedia Lead Fetcher
     async function fetchWikipediaSummary(query, wantsDateOnly = false) {
       try {
         let cleanQuery = query.trim();
         
-        // Exact mappings for high-priority aliases
         if (/^wii\s*u$/i.test(cleanQuery)) cleanQuery = 'Wii U';
         else if (/^ps2$/i.test(cleanQuery)) cleanQuery = 'PlayStation 2';
         else if (/^ps3$/i.test(cleanQuery)) cleanQuery = 'PlayStation 3';
         else if (/^ps4$/i.test(cleanQuery)) cleanQuery = 'PlayStation 4';
         else if (/^ps5$/i.test(cleanQuery)) cleanQuery = 'PlayStation 5';
+        else if (/^gamecube$/i.test(cleanQuery)) cleanQuery = 'GameCube';
         else if (/^switch$/i.test(cleanQuery) || /^nintendo\s+switch$/i.test(cleanQuery)) cleanQuery = 'Nintendo Switch';
         else {
           const resolvedTitle = await searchWikipediaTitle(cleanQuery);
@@ -490,7 +490,7 @@
         lastUserInput = clean;
       }
 
-      // 1. Release Date Query
+      // 1. Release Date Query Intent
       const dateQueryMatch = clean.match(/^(?:when was|when did)\s+(?:the\s+)?([^,?!.]+?)\s+(?:released|come out|launch|launched)/i);
       if (dateQueryMatch && dateQueryMatch[1]) {
         const queryTerm = dateQueryMatch[1].trim();
@@ -504,12 +504,12 @@
         }
       }
 
-      // 2. Wikipedia Search / Direct Query Intent
-      const wikiQueryMatch = clean.match(/^(?:what(?:'s|s| is)?(?:\s+an?|\s+the)?|who(?:'s|s| is| was)?(?:\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define)\s+(.+)/i);
-      const isGamesQuery = /(?:launch games?|launch titles?|games for)\b/i.test(clean);
+      // 2. Comprehensive Wikipedia Intent Extractor (Catches "what are some", "what were the", etc.)
+      const wikiQueryMatch = clean.match(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i);
+      const isGamesOrInfoQuery = /(?:launch games?|launch titles?|launch lineup|games for)\b/i.test(clean);
 
-      if ((wikiQueryMatch && wikiQueryMatch[1]) || isGamesQuery) {
-        const queryTerm = wikiQueryMatch ? wikiQueryMatch[1].replace(/^(?:the|a|an)\s+/i, '').trim() : clean;
+      if ((wikiQueryMatch && wikiQueryMatch[1]) || isGamesOrInfoQuery) {
+        const queryTerm = wikiQueryMatch ? wikiQueryMatch[1].replace(/^(?:some|the|a|an)\s+/i, '').trim() : clean;
         if (!stopWords.has(queryTerm) && queryTerm.length >= 2) {
           const wikiSummary = await fetchWikipediaSummary(queryTerm);
           if (wikiSummary) {
