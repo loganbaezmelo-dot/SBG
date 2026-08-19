@@ -185,6 +185,10 @@
       "what", "whats", "what's", "who", "whos", "who's", "tell"
     ]);
 
+    function formatName(raw) {
+      return raw.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
+
     function extractSubject(sentence) {
       const phrasePatterns = [
         /(?:i wanna do some|i want to play|i wanna play|i like|i love|tell me about|thinking about|what about)\s+(.+)/i,
@@ -234,28 +238,35 @@
 
     function generateResponse(input) {
       const clean = input.toLowerCase().trim();
-      let name = memory.get('userName');
-      const nameTag = name ? `, ${name}` : "";
+      const rawInput = input.trim();
+      
+      let fullName = memory.get('userName');
+      let firstName = fullName ? fullName.split(" ")[0] : "";
+      
+      // Randomly decide whether to attach the name tag (about 50% of the time so it doesn't get repetitive)
+      const useNameTag = firstName && Math.random() > 0.5;
+      const nameTag = useNameTag ? `, ${firstName}` : "";
+      
       const currentPrompt = lastBotPrompt;
       lastBotPrompt = "";
 
-      // 1. Asking about identity / name recall (catches "whats my name", "what's my name", "who am i", etc.)
+      // 1. Asking about name recall (Replies with FULL name)
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
-        return name ? `Your name is ${name}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
+        return fullName ? `Your name is ${fullName}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 2. Name Extraction / Learning
-      const nameMatch = clean.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z]+)/i);
+      // 2. Name Extraction / Learning (Matches full names)
+      const nameMatch = rawInput.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)/i);
       if (nameMatch && nameMatch[1]) {
-        const detectedName = nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1);
-        memory.set('userName', detectedName);
-        return `Got it! I'll remember that your name is ${detectedName}.`;
+        const parsedName = formatName(nameMatch[1]);
+        memory.set('userName', parsedName);
+        return `Got it! I'll remember that your name is ${parsedName}.`;
       }
 
-      if ((!name || currentPrompt === "ask_name") && clean.split(" ").length === 1 && clean.length > 1 && !stopWords.has(clean)) {
-        const singleName = clean.charAt(0).toUpperCase() + clean.slice(1);
-        memory.set('userName', singleName);
-        return `Nice to meet you, ${singleName}! I've logged that in my memory.`;
+      if ((!fullName || currentPrompt === "ask_name") && rawInput.split(" ").length <= 3 && rawInput.length > 1 && !stopWords.has(clean)) {
+        const parsedName = formatName(rawInput);
+        memory.set('userName', parsedName);
+        return `Nice to meet you, ${parsedName}! I've logged that in my memory.`;
       }
 
       // 3. Positive Status ("good", "great", "fine", etc.)
@@ -338,9 +349,9 @@
 
       if (clean.includes("what do you remember") || clean.includes("what do you know about me")) {
         const facts = memory.get('facts') || [];
-        if (!name && facts.length === 0) return "My memory banks are currently empty!";
+        if (!fullName && facts.length === 0) return "My memory banks are currently empty!";
         let info = [];
-        if (name) info.push(`Your name is ${name}`);
+        if (fullName) info.push(`Your full name is ${fullName}`);
         if (facts.length > 0) info.push(`Things you told me: ${facts.join(", ")}`);
         return info.join(". ") + ".";
       }
