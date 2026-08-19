@@ -169,6 +169,28 @@
     const messagesContainer = document.getElementById('messages');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
+    let lastFallback = "";
+
+    function reflect(text) {
+      const reflections = {
+        "i am": "you are",
+        "i was": "you were",
+        "i": "you",
+        "me": "you",
+        "my": "your",
+        "myself": "yourself",
+        "you are": "I am",
+        "you were": "I was",
+        "you": "me",
+        "your": "my",
+        "yours": "mine"
+      };
+
+      return text
+        .split(/\s+/)
+        .map(word => reflections[word.toLowerCase()] || word)
+        .join(" ");
+    }
 
     function appendMessage(text, sender) {
       const msg = document.createElement('div');
@@ -202,7 +224,7 @@
         return `Got it! I'll remember that your name is ${detectedName}.`;
       }
 
-      // If user just types a single word response when we don't have their name
+      // If user just types a single word response when we don't have their name yet
       if (!name && clean.split(" ").length === 1 && clean.length > 1) {
         const singleName = clean.charAt(0).toUpperCase() + clean.slice(1);
         memory.set('userName', singleName);
@@ -214,12 +236,29 @@
         return name ? `Your name is ${name}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 3. Identity of SBG
-      if (clean.includes("who are you") || clean.includes("what are you")) {
-        return "I'm SBG: Simulated But Good! Not quite a multi-billion parameter LLM, but I have deterministic charm and actual memory.";
+      // 3. Capabilities / Help
+      if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
+        return "Here's what I can do: remember your name and facts ('remember that...'), recall stored info ('what do you remember'), hold conversations, reflect statements, and keep local memory across refreshes!";
       }
 
-      // 4. Greetings
+      // 4. Identity of SBG
+      if (clean.includes("who are you") || clean.includes("what are you")) {
+        return "I'm SBG: Simulated But Good! A classic symbolic AI with persistent memory and deterministic logic.";
+      }
+
+      // 5. Short acknowledgements
+      if (/^(ok|okay|k|cool|alright|bet|nice|neat|fs|facts|word|lol|lmao|gotcha)\b/i.test(clean)) {
+        const acks = [
+          "Yep!",
+          "Sounds good.",
+          "Gotcha.",
+          "For sure.",
+          "Cool cool."
+        ];
+        return acks[Math.floor(Math.random() * acks.length)];
+      }
+
+      // 6. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         const greetings = [
           name ? `Hey ${name}! How's it going?` : "Hello there! How's your day going?",
@@ -229,12 +268,18 @@
         return greetings[Math.floor(Math.random() * greetings.length)];
       }
 
-      // 5. How are you / status
+      // 7. Status / How are you
       if (clean.includes("how are you") || clean.includes("how r u")) {
         return "Running smoothly at 60 FPS in your browser cache! How about yourself?";
       }
 
-      // 6. Generic Memory Factoid System (e.g. "remember that I like apples")
+      // 8. Feelings (ELIZA style)
+      const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
+      if (feelMatch && feelMatch[1]) {
+        return `Why do you feel ${feelMatch[1]}? Does that happen often?`;
+      }
+
+      // 9. Memory Factoid System
       const rememberMatch = clean.match(/remember that (.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const facts = memory.get('facts') || [];
@@ -252,15 +297,27 @@
         return info.join(". ") + ".";
       }
 
-      // 7. Fallback Responses
+      // 10. Non-Repeating Fallbacks + Context anchors
+      const facts = memory.get('facts') || [];
+      if (facts.length > 0 && Math.random() > 0.6) {
+        const randomFact = facts[Math.floor(Math.random() * facts.length)];
+        return `That reminds me... earlier you mentioned that ${randomFact}. Is that related?`;
+      }
+
       const fallbacks = [
         "Interesting point. Tell me more about that.",
         "I'm simulated, but that sounds legit.",
         name ? `That's classic, ${name}.` : "I hear you.",
         "Storing that thought in volatile RAM.",
-        "Fair enough!"
+        "Fair enough!",
+        "Got any other facts for me to remember?",
+        "Tell me more about what you're thinking."
       ];
-      return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+
+      const availableFallbacks = fallbacks.filter(f => f !== lastFallback);
+      const picked = availableFallbacks[Math.floor(Math.random() * availableFallbacks.length)];
+      lastFallback = picked;
+      return picked;
     }
 
     chatForm.addEventListener('submit', (e) => {
@@ -271,11 +328,10 @@
       appendMessage(val, 'user');
       userInput.value = '';
 
-      // Simulate a realistic typing delay
       setTimeout(() => {
         const botReply = generateResponse(val);
         appendMessage(botReply, 'bot');
-      }, 400);
+      }, 350);
     });
 
     function clearMemory() {
