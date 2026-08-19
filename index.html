@@ -374,8 +374,8 @@
         lastUserInput = clean;
       }
 
-      // 1. History & Conversation Recall
-      const isHistoryCheck = /^(?:what (?:was i|were we) (?:doing|talking about|saying)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
+      // 1. History & Conversation Recall (Catches "what have we talked about", "what was i doing", etc.)
+      const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|talking about|talked about|talk about|saying|said)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
@@ -403,7 +403,7 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Detected Known Feature on Existing Topic (e.g. "It has aroma", "I use aroma on it")
+      // 4. Detected Known Feature on Existing Topic
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         activeFeature = detectedFeature;
@@ -572,6 +572,7 @@
         }
         lastBotPrompt = "ask_why_topic";
         
+        const titleCaseSubject = extractedSubject.charAt(0).toUpperCase() + extractedSubject.slice(1);
         const subjectQuestions = [
           `What got you interested in the ${extractedSubject}${nameTag}?`,
           `What about the ${extractedSubject} are you thinking about${nameTag}?`,
@@ -633,4 +634,3 @@
   </script>
 </body>
 </html>
-
