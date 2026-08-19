@@ -344,16 +344,17 @@
       return "neutral";
     }
 
-    // Client-side Wikipedia Fetcher with NLP Condensation
+    // Client-side Wikipedia Fetcher with Clean Date Aggregation
     async function fetchWikipediaSummary(query) {
       try {
         let cleanQuery = query.trim().replace(/\s+/g, '_');
-        // Console specific aliases
         if (cleanQuery.toLowerCase() === 'wii_u' || cleanQuery.toLowerCase() === 'wiiu') cleanQuery = 'Wii_U';
         if (cleanQuery.toLowerCase() === 'ps2') cleanQuery = 'PlayStation_2';
         if (cleanQuery.toLowerCase() === 'ps3') cleanQuery = 'PlayStation_3';
         if (cleanQuery.toLowerCase() === 'ps4') cleanQuery = 'PlayStation_4';
         if (cleanQuery.toLowerCase() === 'ps5') cleanQuery = 'PlayStation_5';
+        if (cleanQuery.toLowerCase() === 'gamecube') cleanQuery = 'GameCube';
+        if (cleanQuery.toLowerCase() === 'nintendo_switch' || cleanQuery.toLowerCase() === 'switch') cleanQuery = 'Nintendo_Switch';
         
         const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`);
         if (!res.ok) return null;
@@ -362,8 +363,23 @@
         
         let extract = data.extract;
         extract = extract.replace(/\[\d+\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
-        const sentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
-        const condensed = sentences.slice(0, 2).join(' ').trim();
+        
+        // Clean multi-region date dumps down to the primary launch year
+        extract = extract.replace(/released in Japan on [^,]+, in North America on [^,]+, and in Europe on [^.]+/i, (match) => {
+          const year = match.match(/\b(19\d\d|20\d\d)\b/);
+          return year ? `originally released in ${year[0]}` : "released worldwide";
+        });
+        
+        const allSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
+        const selected = [allSentences[0]];
+        
+        for (let i = 1; i < allSentences.length; i++) {
+          const s = allSentences[i].trim();
+          selected.push(s);
+          if (selected.length >= 2) break;
+        }
+        
+        const condensed = selected.join(' ').trim();
         return condensed.length > 15 ? condensed : null;
       } catch (err) {
         return null;
@@ -435,7 +451,7 @@
         lastUserInput = clean;
       }
 
-      // 1. Wikipedia Direct Query Intent (Expanded to catch "whats a", "what's a", "define", etc.)
+      // 1. Wikipedia Direct Query Intent
       const wikiQueryMatch = clean.match(/^(?:what(?:'s|s| is)?(?:\s+an?|\s+the)?|who(?:'s|s| is| was)?(?:\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define)\s+(.+)/i);
       if (wikiQueryMatch && wikiQueryMatch[1]) {
         const queryTerm = wikiQueryMatch[1].replace(/^(?:the|a|an)\s+/i, '').trim();
