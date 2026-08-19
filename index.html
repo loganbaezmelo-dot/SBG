@@ -428,7 +428,7 @@
         ]);
       }
 
-      // 4. Memory Factoid Storage (Evaluated early)
+      // 4. Memory Factoid Storage
       const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const factText = rememberMatch[1].trim();
@@ -490,7 +490,7 @@
           `Glad to hear it${nameTag}! What's next on your mind?`,
           `For sure${nameTag}! What are we getting into next?`,
           `100%${nameTag}. What else is going on?`,
-          `Love that! What project are you tackling next${nameTag}?`,
+          `Love that! What are you tackling next${nameTag}?`,
           `Awesome. What's the next move${nameTag}?`
         ]);
       }
@@ -713,13 +713,13 @@
         ]);
       }
 
-      // 19. Open-Ended Short Acknowledgements (Fixed dead-end "Cool cool")
+      // 19. Natural Short Acknowledgements (Fixed: no more assuming a plan)
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
-          `Cool cool! What's next on your mind${nameTag}?`,
-          `Sounds like a plan! What are we tackling next${nameTag}?`,
-          `Gotcha! What are you working on right now${nameTag}?`,
-          `Bet! What's the next move${nameTag}?`,
+          `Gotcha! What's next on your mind${nameTag}?`,
+          `Cool! What are you working on right now${nameTag}?`,
+          `Alright! What's the move${nameTag}?`,
+          `Bet! What are we getting into${nameTag}?`,
           `For sure! What else is happening today${nameTag}?`
         ]);
       }
