@@ -357,7 +357,7 @@
       return "neutral";
     }
 
-    // Pure Wikipedia Lead Fetcher with Adaptive Date Filtering
+    // Pure Wikipedia Lead Fetcher with Robust Clause & Conjunction Cleanup
     async function fetchWikipediaSummary(query, wantsDateOnly = false) {
       try {
         let cleanQuery = query.trim().replace(/\s+/g, '_');
@@ -398,15 +398,21 @@
           }
         }
 
-        // Clean rival console listings while preserving the release date clause
+        // Clean competitor lists and remove trailing conjunctions
         const cleanedSentences = [];
         for (let s of rawSentences) {
           let str = s.trim();
-          // Remove competitor tail clauses while keeping release timing
-          str = str.replace(/;?\s*(?:it\s+)?competed with\s+[^.!?]+[.!?]/i, '.');
-          str = str.replace(/;?\s*(?:it\s+)?competes with\s+[^.!?]+[.!?]/i, '.');
+          
+          // Strip out competitor tail clauses
+          str = str.replace(/;?\s*(?:and\s+)?(?:it\s+)?competed with\s+[^.!?]+[.!?]/i, '.');
+          str = str.replace(/;?\s*(?:and\s+)?(?:it\s+)?competes with\s+[^.!?]+[.!?]/i, '.');
           str = str.replace(/,\s*competing with\s+[^.!?]+[.!?]/i, '.');
           
+          // Strip dangling conjunctions like 'and.', 'or.', 'but.', etc.
+          str = str.replace(/\s+(?:and|or|but|then|plus|also|while|with)\s*[.!?]/i, '.');
+          str = str.replace(/,\s*[.!?]/g, '.');
+          str = str.trim();
+
           if (str.length > 10) {
             cleanedSentences.push(str);
           }
