@@ -169,9 +169,8 @@
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     
-    // Conversation State Context
     let lastFallback = "";
-    let lastBotPrompt = ""; // Tracks what SBG just asked the user
+    let lastBotPrompt = "";
 
     const stopWords = new Set([
       "i", "me", "my", "myself", "we", "our", "you", "your", "he", "she", "it", "they",
@@ -182,7 +181,8 @@
       "then", "once", "here", "there", "when", "where", "why", "how", "all", "any",
       "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor",
       "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna",
-      "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk"
+      "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
+      "what", "whats", "what's", "who", "whos", "who's", "tell"
     ]);
 
     function extractSubject(sentence) {
@@ -237,9 +237,14 @@
       let name = memory.get('userName');
       const nameTag = name ? `, ${name}` : "";
       const currentPrompt = lastBotPrompt;
-      lastBotPrompt = ""; // Reset prompt state for next turn
+      lastBotPrompt = "";
 
-      // 1. Name Extraction / Learning
+      // 1. Asking about identity / name recall (catches "whats my name", "what's my name", "who am i", etc.)
+      if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
+        return name ? `Your name is ${name}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
+      }
+
+      // 2. Name Extraction / Learning
       const nameMatch = clean.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z]+)/i);
       if (nameMatch && nameMatch[1]) {
         const detectedName = nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1);
@@ -253,9 +258,8 @@
         return `Nice to meet you, ${singleName}! I've logged that in my memory.`;
       }
 
-      // 2. Positive Status ("good", "great", "fine", etc.)
+      // 3. Positive Status ("good", "great", "fine", etc.)
       if (/^(good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
-        // If bot previously asked how you are doing
         if (currentPrompt === "ask_how_are_you") {
           const replies = [
             `Glad to hear that${nameTag}! What are you working on today?`,
@@ -264,7 +268,6 @@
           ];
           return replies[Math.floor(Math.random() * replies.length)];
         } else {
-          // If user randomly says "good" without being asked
           const randomGoodReplies = [
             `Nice! What's happening that's so good${nameTag}?`,
             `Love that energy${nameTag}. What made your day good?`,
@@ -274,14 +277,9 @@
         }
       }
 
-      // 3. Negative Status
+      // 4. Negative Status
       if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean)) {
         return `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`;
-      }
-
-      // 4. Name recall
-      if (clean.includes("what is my name") || clean.includes("who am i") || clean.includes("do you know me")) {
-        return name ? `Your name is ${name}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
       // 5. Capabilities / Help
@@ -306,7 +304,7 @@
         return acks[Math.floor(Math.random() * acks.length)];
       }
 
-      // 8. Greetings (Sets the state so SBG knows it asked how you are)
+      // 8. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         lastBotPrompt = "ask_how_are_you";
         const greetings = [
