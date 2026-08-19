@@ -404,18 +404,26 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Therapeutic / Eliza-Style Question Handling
-      if (/^is something (?:troubling|wrong|bothering)/i.test(clean)) {
+      // 4. Robust Inquiry / Philosophical / Question Deflection Handlers
+      if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`;
       }
-      if (/^what if (?:i|you) were thinking/i.test(clean) || /^what if\b/i.test(clean)) {
+
+      if (/^(?:what if|suppose|supposing|imagine if)\b/i.test(clean)) {
         return `Hypotheticals are always interesting${nameTag}! What led you to that thought?`;
       }
-      if (/^what do you know about/i.test(clean)) {
-        const query = clean.replace(/^what do you know about\s+/i, '');
-        return `I know whatever you teach me about ${query || "it"}${nameTag}! Want to give me the details?`;
+
+      if (/^(?:what do you know about|tell me what you know about|do you know anything about|what are your thoughts on)\s*(.*)/i.test(clean)) {
+        const match = clean.match(/^(?:what do you know about|tell me what you know about|do you know anything about|what are your thoughts on)\s*(.*)/i);
+        const query = match && match[1] ? match[1].replace(/^(?:the|a|an)\s+/i, '').trim() : "";
+        if (query.length > 1 && !stopWords.has(query)) {
+          return `I know whatever you teach me about ${query}${nameTag}! Want to give me the details?`;
+        } else {
+          return `I know what we log into memory${nameTag}! What were you specifically wondering about?`;
+        }
       }
-      if (/^would it matter (?:to you)?/i.test(clean)) {
+
+      if (/^(?:would|does|why would|why does)\s+(?:that|it|this)\s+(?:matter|count)\b/i.test(clean) || /^why do you care\b/i.test(clean)) {
         return `Of course it matters${nameTag}! I'm here to follow the thread.`;
       }
 
