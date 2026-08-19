@@ -346,14 +346,12 @@
 
     async function searchWikipediaTitle(query) {
       try {
-        // 1. Try exact OpenSearch
         let res = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&namespace=0&format=json&origin=*`);
         if (res.ok) {
           let data = await res.json();
           if (data && data[1] && data[1].length > 0) return data[1][0];
         }
 
-        // 2. Full-text search fallback
         res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=1&format=json&origin=*`);
         if (res.ok) {
           let data = await res.json();
@@ -367,28 +365,19 @@
       }
     }
 
-    async function fetchWikipediaSummary(query, wantsDateOnly = false) {
+    async function fetchWikipediaSummary(query, mode = "general") {
       try {
         let cleanQuery = query.trim();
         
-        let strippedTopic = cleanQuery
-          .replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|lookup|define)\s+/i, '')
-          .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|release date|specs)$/i, '')
-          .trim();
-
-        if (/^wii\s*u$/i.test(strippedTopic)) cleanQuery = 'Wii U';
-        else if (/^ps2$/i.test(strippedTopic)) cleanQuery = 'PlayStation 2';
-        else if (/^ps3$/i.test(strippedTopic)) cleanQuery = 'PlayStation 3';
-        else if (/^ps4$/i.test(strippedTopic)) cleanQuery = 'PlayStation 4';
-        else if (/^ps5$/i.test(strippedTopic)) cleanQuery = 'PlayStation 5';
-        else if (/^gamecube$/i.test(strippedTopic)) cleanQuery = 'GameCube';
-        else if (/^switch$/i.test(strippedTopic) || /^nintendo\s+switch$/i.test(strippedTopic)) cleanQuery = 'Nintendo Switch';
-        else {
-          const resolved = await searchWikipediaTitle(strippedTopic) || await searchWikipediaTitle(cleanQuery);
-          if (resolved) cleanQuery = resolved;
+        let resolvedTitle = await searchWikipediaTitle(cleanQuery);
+        if (!resolvedTitle) {
+          const stripped = cleanQuery.replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|lookup|define)\s+/i, '').trim();
+          resolvedTitle = await searchWikipediaTitle(stripped);
         }
 
-        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(cleanQuery)}&format=json&origin=*`);
+        const targetTitle = resolvedTitle || cleanQuery;
+
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(targetTitle)}&format=json&origin=*`);
         if (!res.ok) return null;
         const data = await res.json();
         const pages = data.query && data.query.pages;
@@ -407,9 +396,17 @@
 
         const rawSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
 
-        if (wantsDateOnly) {
+        if (mode === "date") {
           for (let s of rawSentences) {
             if (/\b(?:released in|released on|launched in|launched on|first released)\b/i.test(s)) {
+              return s.trim();
+            }
+          }
+        }
+
+        if (mode === "games") {
+          for (let s of rawSentences) {
+            if (/\b(?:launch title|launch titles|launch games|lineup|bundled with|alongside)\b/i.test(s)) {
               return s.trim();
             }
           }
@@ -509,7 +506,7 @@
       const dateQueryMatch = clean.match(/^(?:when was|when did)\s+(?:the\s+)?([^,?!.]+?)\s+(?:released|come out|launch|launched)/i);
       if (dateQueryMatch && dateQueryMatch[1]) {
         const queryTerm = dateQueryMatch[1].trim();
-        const dateSummary = await fetchWikipediaSummary(queryTerm, true);
+        const dateSummary = await fetchWikipediaSummary(queryTerm, "date");
         if (dateSummary) {
           return pickRandom([
             `According to the records: ${dateSummary}`,
@@ -521,15 +518,31 @@
         }
       }
 
-      // 2. Comprehensive Wikipedia & Information Search Intent
-      const isInformationalQuery = /^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i.test(clean) || /(?:launch games?|launch titles?|launch lineup|games for)\b/i.test(clean);
+      // 2. Launch Games / Games List Specific Query
+      const isGamesQuery = /(?:launch games?|launch titles?|launch lineup|what games did it launch with)\b/i.test(clean);
+      if (isGamesQuery) {
+        const queryTerm = clean.replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '').trim();
+        const gamesSummary = await fetchWikipediaSummary(queryTerm, "games") || await fetchWikipediaSummary(queryTerm, "general");
+        if (gamesSummary) {
+          return pickRandom([
+            `Here's what Wikipedia has on the lineup${nameTag}: ${gamesSummary}`,
+            `Found this regarding the launch games: ${gamesSummary}`,
+            `Looked that up! Basically, ${gamesSummary}`
+          ]);
+        } else {
+          return `I checked Wikipedia, but couldn't find an official launch game lineup for "${queryTerm}"${nameTag}!`;
+        }
+      }
+
+      // 3. General Information Query Intent
+      const isInformationalQuery = /^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i.test(clean);
 
       if (isInformationalQuery) {
         const match = clean.match(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i);
         const queryTerm = match ? match[1].replace(/^(?:some|the|a|an)\s+/i, '').trim() : clean;
         
         if (!stopWords.has(queryTerm) && queryTerm.length >= 2) {
-          const wikiSummary = await fetchWikipediaSummary(queryTerm);
+          const wikiSummary = await fetchWikipediaSummary(queryTerm, "general");
           if (wikiSummary) {
             return pickRandom([
               `From what I gathered, ${wikiSummary}`,
@@ -542,7 +555,7 @@
         }
       }
 
-      // 3. Compound Sentence & Multi-Clause Intent Engine
+      // 4. Compound Sentence & Multi-Clause Intent Engine
       const compoundSplit = rawInput.split(/\s+(?:and(?:\s+i)?|also(?:\s+i)?|plus(?:\s+i)?|then(?:\s+i)?|but(?:\s+i)?)\s+/i);
       if (compoundSplit.length >= 2) {
         const clause1 = compoundSplit[0].trim();
@@ -570,7 +583,7 @@
         }
       }
 
-      // 4. History & Conversation Recall
+      // 5. History & Conversation Recall
       const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|done|talking about|talked about|talk about|saying|said|discussed|covered)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
@@ -583,7 +596,7 @@
         }
       }
 
-      // 5. Single-letter Ignore
+      // 6. Single-letter Ignore
       if (clean.length <= 1) {
         return pickRandom([
           `Just one letter? Type out a word${nameTag}!`,
@@ -592,7 +605,7 @@
         ]);
       }
 
-      // 6. Frustration / Outbursts
+      // 7. Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -603,7 +616,7 @@
         ]);
       }
 
-      // 7. Memory Factoid Storage
+      // 8. Memory Factoid Storage
       const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const factText = rememberMatch[1].trim();
@@ -635,7 +648,7 @@
         return info.join(". ") + ".";
       }
 
-      // 8. Directional Echos
+      // 9. Directional Echos
       if (/^(?:your|my)\s+(?:end|side)\b/i.test(clean)) {
         return pickRandom([
           `Just everything on my side! Code, memory, and logic are running smooth${nameTag}.`,
@@ -644,7 +657,7 @@
         ]);
       }
 
-      // 9. Status Return
+      // 10. Status Return
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
         contextStack.questionState = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
@@ -661,7 +674,7 @@
         ]);
       }
 
-      // 10. Positive Acknowledgements
+      // 11. Positive Acknowledgements
       if (/^(?:that(?:'s|s)?|it(?:'s|s)?|sounds?)\s+(?:good|great|cool|awesome|dope|nice|solid|valid|fair)\b/i.test(clean)) {
         return pickRandom([
           `Glad to hear it${nameTag}! What's next on your mind?`,
@@ -672,7 +685,7 @@
         ]);
       }
 
-      // 11. Inquiries & Deflections
+      // 12. Inquiries & Deflections
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return pickRandom([
           `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`,
@@ -713,7 +726,7 @@
         ]);
       }
 
-      // 12. Detected Feature / Sub-Topic on Active Context
+      // 13. Detected Feature / Sub-Topic on Active Context
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         contextStack.subTopic = detectedFeature;
@@ -743,7 +756,7 @@
         ]);
       }
 
-      // 13. Activity Updates
+      // 14. Activity Updates
       const isStatusOnly = /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:doing\s+)?(?:great|good|fine|well|alright|ok|okay)$/i.test(clean);
       if (!isStatusOnly && /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i.test(clean)) {
         const activityMatch = clean.match(/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i);
@@ -757,7 +770,7 @@
         }
       }
 
-      // 14. Feature Details
+      // 15. Feature Details
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         contextStack.questionState = "ask_homebrew_apps";
         return pickRandom([
@@ -767,7 +780,7 @@
         ]);
       }
 
-      // 15. Vague Quantity Answers
+      // 16. Vague Quantity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentQuestionState === "ask_feature_details") {
           contextStack.questionState = "ask_specific_app";
@@ -786,7 +799,7 @@
         }
       }
 
-      // 16. Disagreements
+      // 17. Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentQuestionState === "echo_check") {
           return pickRandom([
@@ -802,7 +815,7 @@
         ]);
       }
 
-      // 17. Positive Status
+      // 18. Positive Status
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentQuestionState === "general_greeting" || currentQuestionState === "ask_how_are_you") {
           return pickRandom([
@@ -822,7 +835,7 @@
         }
       }
 
-      // 18. Topic Reasons
+      // 19. Topic Reasons
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
         if (contextStack.topic) {
           contextStack.questionState = "ask_favorite_feature";
@@ -839,7 +852,7 @@
         }
       }
 
-      // 19. Name Recall
+      // 20. Name Recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName 
           ? pickRandom([
@@ -850,7 +863,7 @@
           : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 20. Name Extraction
+      // 21. Name Extraction
       const isActivityPhrase = /^(?:up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
@@ -877,7 +890,7 @@
         ]);
       }
 
-      // 21. Negative Status
+      // 22. Negative Status
       if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean) || contextStack.sentiment === "negative") {
         return pickRandom([
           `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
@@ -886,7 +899,7 @@
         ]);
       }
 
-      // 22. Natural Short Acknowledgements
+      // 23. Natural Short Acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
           `Gotcha! What's next on your mind${nameTag}?`,
@@ -897,12 +910,12 @@
         ]);
       }
 
-      // 23. Help & Commands
+      // 24. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: dynamically lookup console info and games on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
       }
 
-      // 24. Identity
+      // 25. Identity
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
@@ -910,7 +923,7 @@
         ]);
       }
 
-      // 25. Greetings
+      // 26. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -921,7 +934,7 @@
         ]);
       }
 
-      // 26. Feelings
+      // 27. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         return pickRandom([
@@ -931,7 +944,7 @@
         ]);
       }
 
-      // 27. Context Stack Engine: Single Subject & Console Extraction
+      // 28. Context Stack Engine: Single Subject & Console Extraction
       const extractedSubject = extractSubject(rawInput);
       if (extractedSubject && extractedSubject.length > 1) {
         const subKey = extractedSubject.toLowerCase();
@@ -982,14 +995,14 @@
         ]);
       }
 
-      // 28. Memory Anchors
+      // 29. Memory Anchors
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 29. Clean Fallbacks
+      // 30. Clean Fallbacks
       return pickRandom([
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
