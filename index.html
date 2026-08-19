@@ -198,8 +198,7 @@
       "grt": "great",
       "plz": "please",
       "pls": "please",
-      "ur": "your",
-      "u": "you"
+      "ur": "your"
     };
 
     function getLevenshtein(a, b) {
@@ -220,7 +219,7 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true"];
 
     function normalizeText(text) {
       return text.toLowerCase().split(/\s+/).map(word => {
@@ -248,7 +247,8 @@
       "both", "each", "few", "more", "most", "other", "such", "no", "nor",
       "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna",
       "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
-      "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye"
+      "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye",
+      "true", "real", "fr", "facts", "truth"
     ]);
 
     function formatName(raw) {
@@ -350,8 +350,8 @@
         return `Nice to meet you, ${parsedName}! I've logged that in my memory.`;
       }
 
-      // 3. Positive Status / Agreements (Catches "yeah", "yup", "good", "doing good", etc.)
-      if (/^(yeah|yea|yep|yup|ye|good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
+      // 3. Positive Status / Agreements (Catches "yeah", "true", "facts", "good", etc.)
+      if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentPrompt === "general_greeting") {
           return `Awesome! So what are we getting into today${nameTag}?`;
         } else if (currentPrompt === "ask_how_are_you") {
@@ -363,9 +363,9 @@
           return replies[Math.floor(Math.random() * replies.length)];
         } else {
           const randomGoodReplies = [
-            `Nice! What's happening that's so good${nameTag}?`,
-            `Love that energy${nameTag}. What made your day good?`,
-            `Good vibes only. What are you up to right now${nameTag}?`
+            `100%${nameTag}. What's on your mind?`,
+            `Facts${nameTag}. What are you up to right now?`,
+            `For sure${nameTag}. Tell me what's happening.`
           ];
           return randomGoodReplies[Math.floor(Math.random() * randomGoodReplies.length)];
         }
@@ -387,7 +387,7 @@
       }
 
       // 7. Short acknowledgements
-      if (/^(ok|okay|k|cool|alright|bet|nice|neat|fs|facts|word|lol|lmao|gotcha)\b/i.test(clean)) {
+      if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|lol|lmao|gotcha)\b/i.test(clean)) {
         const acks = [
           `Yep${nameTag}!`,
           `Sounds good${nameTag}.`,
@@ -439,7 +439,7 @@
         return info.join(". ") + ".";
       }
 
-      // 12. Intelligent Subject Extraction
+      // 12. Intelligent Subject Extraction (Extracts "Wii U" cleanly)
       const extractedSubject = extractSubject(normalized);
       if (extractedSubject && extractedSubject.length > 0) {
         const subjectQuestions = [
