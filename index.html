@@ -227,7 +227,7 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma"];
 
     function normalizeText(text) {
       return text.toLowerCase().split(/\s+/).map(word => {
@@ -268,17 +268,27 @@
     }
 
     function cleanSubjectText(text) {
-      return text.replace(/^(?:the|a|an|also|my|your|some|use|using|i use)\s+/i, '').replace(/[?!.,]/g, '').trim();
+      return text
+        .replace(/^(?:the|a|an|also|my|your|some|use|using|i use|i have|i got)\s+/i, '')
+        .replace(/\s+(?:on it|with it|installed|loaded|running|on my wii u|on the wii u)$/i, '')
+        .replace(/[?!.,]/g, '')
+        .trim();
     }
 
     function extractSubject(sentence) {
-      // 1. Specific multi-word console / platform capture
+      // Specific multi-word console detection
       const consoleMatch = sentence.match(/\b(wii\s+u|wii|ps1|ps2|ps3|ps4|ps5|xbox\s+360|xbox\s+one|xbox|switch|3ds|ds|psp|ps\s*vita)\b/i);
       if (consoleMatch) {
         return consoleMatch[1].toLowerCase().trim();
       }
 
-      // 2. Direct phrase extraction
+      // Feature extraction (e.g. aroma, payload loader, homebrew)
+      const featureMatch = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|homebrew|cfw|pretendo|loadiine)\b/i);
+      if (featureMatch) {
+        return featureMatch[1].toLowerCase().trim();
+      }
+
+      // Direct phrase extraction
       const phrasePatterns = [
         /(?:i have an?|i have|i got an?|i got|i bought an?|i bought)\s+([^,?!]+)/i,
         /(?:i use|i run|it has|it got)\s+([a-zA-Z0-9_-]+(?:\s+and\s+[a-zA-Z0-9_-]+)?)/i,
@@ -293,7 +303,7 @@
         }
       }
 
-      // 3. Fallback token parsing
+      // Fallback token parsing
       const cleanTokens = sentence
         .replace(/[^\w\s-]/gi, '')
         .split(/\s+/)
@@ -391,13 +401,28 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Feature Details / Explanation Handler
+      // 4. Direct Feature Identification on an Active Topic
+      if (/^(?:i have|i use|i run|it has|it got)\s+([a-zA-Z0-9_-]+(?:\s+and\s+[a-zA-Z0-9_-]+)?)\s*(?:on it|installed|loaded)?/i.test(clean)) {
+        const candidate = cleanSubjectText(clean);
+        if (candidate && candidate.length > 1 && !stopWords.has(candidate)) {
+          activeFeature = candidate;
+          if (!topicHistory.includes(candidate)) {
+            topicHistory.push(candidate);
+            memory.set('history', topicHistory);
+          }
+          const target = currentTopic ? ` on the ${currentTopic}` : "";
+          lastBotPrompt = "ask_feature_details";
+          return `Nice, running ${candidate}${target} is solid${nameTag}! What kind of stuff do you do with it?`;
+        }
+      }
+
+      // 5. Feature Details / Explanation Handler
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         lastBotPrompt = "ask_homebrew_apps";
         return `Having full system access is huge${nameTag}! What homebrew apps or plugins are you running on it?`;
       }
 
-      // 5. Vague Quantity / Activity Answers
+      // 6. Vague Quantity / Activity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentPrompt === "ask_feature_details") {
           lastBotPrompt = "ask_specific_app";
@@ -406,20 +431,6 @@
         } else {
           return `Sounds like you've got your hands full${nameTag}! What's the coolest part?`;
         }
-      }
-
-      // 6. Direct Feature Identification
-      if (/^(?:i use|i run|it has|it got)\s+(payload-loader|aroma|homebrew|cfw|pretendo)/i.test(clean)) {
-        const match = clean.match(/(?:i use|i run|it has|it got)\s+(.+)/i);
-        const feature = match ? match[1].trim() : "that setup";
-        activeFeature = feature;
-        if (!topicHistory.includes(feature)) {
-          topicHistory.push(feature);
-          memory.set('history', topicHistory);
-        }
-        const target = currentTopic ? ` on the ${currentTopic}` : "";
-        lastBotPrompt = "ask_feature_details";
-        return `Nice, using ${feature}${target} is awesome${nameTag}! What do you usually do with it?`;
       }
 
       // 7. Negative Disagreements
@@ -561,11 +572,12 @@
         }
         lastBotPrompt = "ask_why_topic";
         
+        const titleCaseSubject = extractedSubject.charAt(0).toUpperCase() + extractedSubject.slice(1);
         const subjectQuestions = [
           `What got you interested in the ${extractedSubject}${nameTag}?`,
           `What about the ${extractedSubject} are you thinking about${nameTag}?`,
           `What do you want to do with the ${extractedSubject}${nameTag}?`,
-          `${extractedSubject.toUpperCase()}? Tell me more about that${nameTag}.`
+          `${titleCaseSubject}? Tell me more about that${nameTag}.`
         ];
         return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
       }
