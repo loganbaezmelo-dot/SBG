@@ -344,7 +344,7 @@
       return "neutral";
     }
 
-    // Client-side Wikipedia Fetcher with Clean Date Aggregation
+    // Client-side Wikipedia Fetcher with Smart Descriptive Sentence Matching
     async function fetchWikipediaSummary(query) {
       try {
         let cleanQuery = query.trim().replace(/\s+/g, '_');
@@ -371,12 +371,23 @@
         });
         
         const allSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
-        const selected = [allSentences[0]];
+        const selected = [allSentences[0].trim()];
         
+        // Look for the descriptive feature sentence across the paragraph
+        let foundFeature = false;
         for (let i = 1; i < allSentences.length; i++) {
           const s = allSentences[i].trim();
-          selected.push(s);
-          if (selected.length >= 2) break;
+          const isFiller = /\b(?:competed with|competes with|generation of|succeeded the|preceded by)\b/i.test(s);
+          
+          if (!isFiller) {
+            selected.push(s);
+            foundFeature = true;
+            break;
+          }
+        }
+        
+        if (!foundFeature && allSentences.length > 1) {
+          selected.push(allSentences[1].trim());
         }
         
         const condensed = selected.join(' ').trim();
@@ -824,7 +835,7 @@
 
       // 22. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: handle compound sentences ('I have Aroma and want to play Mario Kart'), look up Wikipedia summaries ('whats a wii u?'), remember facts, track full chat history, chain features, and store state${nameTag}!`;
+        return `Here's what I can do: handle compound sentences ('I have Aroma and want to play Mario Kart'), look up Wikipedia summaries ('whats the nintendo switch?'), remember facts, track full chat history, chain features, and store state${nameTag}!`;
       }
 
       // 23. Identity
