@@ -428,7 +428,37 @@
         ]);
       }
 
-      // 4. Status Return / "How are you doing" directed to bot
+      // 4. Memory Factoid Storage (Evaluated before general subject extraction)
+      const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
+      if (rememberMatch && rememberMatch[1]) {
+        const factText = rememberMatch[1].trim();
+        const facts = memory.get('facts') || [];
+        
+        let storedFact = factText;
+        if ((factText === "wii u" || factText === "wiiu") && activeFeature) {
+          storedFact = `you have ${activeFeature} on your wii u`;
+        }
+        
+        facts.push(storedFact);
+        memory.set('facts', facts);
+        
+        return pickRandom([
+          `Stored in memory: "${storedFact}"${nameTag}!`,
+          `Got it locked in my storage: "${storedFact}"${nameTag}.`,
+          `Noted! I'll remember that "${storedFact}".`
+        ]);
+      }
+
+      if (clean.includes("what do you remember") || clean.includes("what do you know about me")) {
+        const facts = memory.get('facts') || [];
+        if (!fullName && facts.length === 0) return "My memory banks are currently empty!";
+        let info = [];
+        if (fullName) info.push(`Your full name is ${fullName}`);
+        if (facts.length > 0) info.push(`Things you told me: ${facts.join(", ")}`);
+        return info.join(". ") + ".";
+      }
+
+      // 5. Status Return / "How are you doing" directed to bot
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
         lastBotPrompt = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
@@ -445,7 +475,7 @@
         ]);
       }
 
-      // 5. Positive Acknowledgements / Status ("That's good", "Sounds good")
+      // 6. Positive Acknowledgements / Status
       if (/^(?:that(?:'s|s)?|it(?:'s|s)?|sounds?)\s+(?:good|great|cool|awesome|dope|nice|solid|valid|fair)\b/i.test(clean)) {
         return pickRandom([
           `Glad to hear it${nameTag}! What's next on your mind?`,
@@ -456,7 +486,7 @@
         ]);
       }
 
-      // 6. Inquiries / Deflections / Therapeutic Patterns
+      // 7. Inquiries / Deflections / Therapeutic Patterns
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return pickRandom([
           `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`,
@@ -511,7 +541,7 @@
         ]);
       }
 
-      // 7. Detected Known Feature on Existing Topic (Expanded Multi-Template Rotation)
+      // 8. Detected Known Feature on Existing Topic
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         activeFeature = detectedFeature;
@@ -531,7 +561,7 @@
         ]);
       }
 
-      // 8. Activity Updates
+      // 9. Activity Updates
       const isStatusOnly = /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:doing\s+)?(?:great|good|fine|well|alright|ok|okay)$/i.test(clean);
       if (!isStatusOnly && /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i.test(clean)) {
         const activityMatch = clean.match(/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i);
@@ -545,7 +575,7 @@
         }
       }
 
-      // 9. Feature Details / Explanation Handler
+      // 10. Feature Details / Explanation Handler
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         lastBotPrompt = "ask_homebrew_apps";
         return pickRandom([
@@ -555,7 +585,7 @@
         ]);
       }
 
-      // 10. Vague Quantity / Activity Answers
+      // 11. Vague Quantity / Activity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentPrompt === "ask_feature_details") {
           lastBotPrompt = "ask_specific_app";
@@ -574,7 +604,7 @@
         }
       }
 
-      // 11. Negative Disagreements
+      // 12. Negative Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentPrompt === "echo_check") {
           return pickRandom([
@@ -590,7 +620,7 @@
         ]);
       }
 
-      // 12. Positive Status / Agreements (Stand-alone)
+      // 13. Positive Status / Agreements (Stand-alone)
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentPrompt === "general_greeting" || currentPrompt === "ask_how_are_you") {
           return pickRandom([
@@ -610,7 +640,7 @@
         }
       }
 
-      // 13. Explanations / Reasons referencing active topic
+      // 14. Explanations / Reasons referencing active topic
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentPrompt === "ask_why_topic" && clean.includes("cool"))) {
         if (currentTopic) {
           lastBotPrompt = "ask_favorite_feature";
@@ -627,7 +657,7 @@
         }
       }
 
-      // 14. Asking about name recall
+      // 15. Asking about name recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName 
           ? pickRandom([
@@ -638,7 +668,7 @@
           : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 15. Strict Name Extraction
+      // 16. Strict Name Extraction
       const isActivityPhrase = /^(?:up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
@@ -665,7 +695,7 @@
         ]);
       }
 
-      // 16. Negative Status
+      // 17. Negative Status
       if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean)) {
         return pickRandom([
           `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
@@ -674,12 +704,12 @@
         ]);
       }
 
-      // 17. Capabilities / Help
+      // 18. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
-      // 18. Identity of SBG
+      // 19. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
@@ -687,7 +717,7 @@
         ]);
       }
 
-      // 19. Short acknowledgements
+      // 20. Short acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
           `Yep${nameTag}!`,
@@ -699,7 +729,7 @@
         ]);
       }
 
-      // 20. Greetings
+      // 21. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         lastBotPrompt = "ask_how_are_you";
         return pickRandom([
@@ -710,7 +740,7 @@
         ]);
       }
 
-      // 21. Feelings
+      // 22. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         return pickRandom([
@@ -720,38 +750,27 @@
         ]);
       }
 
-      // 22. Memory Factoid System
-      const rememberMatch = clean.match(/remember that (.*)/i);
-      if (rememberMatch && rememberMatch[1]) {
-        const facts = memory.get('facts') || [];
-        facts.push(rememberMatch[1]);
-        memory.set('facts', facts);
-        return pickRandom([
-          `Stored in memory: "${rememberMatch[1]}"${nameTag}!`,
-          `Got it locked in my storage: "${rememberMatch[1]}"${nameTag}.`,
-          `Noted! I'll remember that "${rememberMatch[1]}".`
-        ]);
-      }
-
-      if (clean.includes("what do you remember") || clean.includes("what do you know about me")) {
-        const facts = memory.get('facts') || [];
-        if (!fullName && facts.length === 0) return "My memory banks are currently empty!";
-        let info = [];
-        if (fullName) info.push(`Your full name is ${fullName}`);
-        if (facts.length > 0) info.push(`Things you told me: ${facts.join(", ")}`);
-        return info.join(". ") + ".";
-      }
-
-      // 23. Intelligent Subject Extraction with Persistent History Logging
+      // 23. Context-Aware Subject Extraction & Topic Management
       const extractedSubject = extractSubject(rawLower);
       if (extractedSubject && extractedSubject.length > 1) {
+        const isExistingTopic = currentTopic === extractedSubject;
         currentTopic = extractedSubject;
+        
         if (!topicHistory.includes(extractedSubject)) {
           topicHistory.push(extractedSubject);
           memory.set('history', topicHistory);
         }
+
+        // If repeating an active console that already has features logged
+        if (isExistingTopic && activeFeature) {
+          return pickRandom([
+            `Right, we were talking about your ${extractedSubject} with ${activeFeature}! What else are you running on it${nameTag}?`,
+            `Yep, still on the ${extractedSubject} setup with ${activeFeature}. Anything new you've added?`,
+            `Got the ${extractedSubject} running ${activeFeature} in focus! What's next on that?`
+          ]);
+        }
+
         lastBotPrompt = "ask_why_topic";
-        
         return pickRandom([
           `What got you interested in ${extractedSubject}${nameTag}?`,
           `What about ${extractedSubject} are you thinking about${nameTag}?`,
@@ -768,7 +787,7 @@
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 25. Clean Natural Fallbacks (No duplicates)
+      // 25. Clean Natural Fallbacks
       return pickRandom([
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
