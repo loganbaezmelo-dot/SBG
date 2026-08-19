@@ -229,7 +229,7 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier"];
 
     function normalizeText(text) {
       return text.toLowerCase().split(/\s+/).map(word => {
@@ -259,7 +259,7 @@
       "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
       "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye",
       "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus",
-      "earlier", "before", "talking", "talked", "mention", "mentioned",
+      "earlier", "before", "talking", "talked", "mention", "mentioned", "wait",
       "fuck", "shit", "damn", "crap", "hell", "bruh", "wtf", "lmao", "lol"
     ]);
 
@@ -303,6 +303,17 @@
       msg.textContent = text;
       messagesContainer.appendChild(msg);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function isHistoryQuery(cleanText) {
+      const historyPatterns = [
+        /(?:what (?:was i|were we) (?:talking|saying|doing|discussing|bringing up))/i,
+        /(?:what did (?:i|we) (?:say|talk about|mention|do|discuss))/i,
+        /(?:wait (?:what was|what were) (?:i|we) (?:talking|doing|saying))/i,
+        /(?:remind me what (?:i was|we were) (?:talking|saying|doing))/i,
+        /(?:what was that earlier|what was i on about|recap our chat|recap conversation|conversation recap)/i
+      ];
+      return historyPatterns.some(pattern => pattern.test(cleanText));
     }
 
     function initBot() {
@@ -349,8 +360,8 @@
         lastUserInput = clean;
       }
 
-      // 1. History & Conversation Recall (Robust Matching)
-      if (/(?:what (?:was i|were we) (?:talking|saying) about|what did (?:i|we) (?:say|talk about)|recap|earlier|before)/i.test(clean) || clean === "what were we talking about" || clean === "what was i talking about") {
+      // 1. Robust History & Conversation Recall
+      if (isHistoryQuery(clean)) {
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
         } else if (topicHistory.length === 1) {
@@ -462,7 +473,7 @@
 
       // 12. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
-        return `I'm SBG: Simulated But Good! A symbolic AI with persistent memory and deterministic logic${nameTag}.`;
+        return `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`;
       }
 
       // 13. Short acknowledgements
@@ -491,7 +502,7 @@
       // 15. Status question directed to bot
       if (clean.includes("how are you") || clean.includes("how r u")) {
         lastBotPrompt = "ask_how_are_you";
-        return `Running smoothly at 60 FPS in your browser cache! How about yourself${nameTag}?`;
+        return `Running smoothly in your browser cache! How about yourself${nameTag}?`;
       }
 
       // 16. Feelings
@@ -543,14 +554,14 @@
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 20. Non-Repeating Fallbacks
+      // 20. Clean Natural Fallbacks
       const fallbacks = [
-        `Interesting point. Tell me more about that${nameTag}.`,
-        `I'm simulated, but that sounds legit${nameTag}.`,
-        `Storing that thought in volatile RAM${nameTag}.`,
+        `Interesting! Tell me more about that${nameTag}.`,
+        `Makes sense${nameTag}. What else?`,
         `Fair enough${nameTag}!`,
         `Got any other facts for me to remember${nameTag}?`,
-        `Tell me more about what you're thinking${nameTag}.`
+        `Tell me more about what you're thinking${nameTag}.`,
+        `Got it! What's next on your mind${nameTag}?`
       ];
 
       const availableFallbacks = fallbacks.filter(f => f !== lastFallback);
