@@ -178,7 +178,6 @@
     let lastBotPrompt = "";
     let currentTopic = ""; 
     let activeFeature = ""; 
-    let topicHistory = []; 
     let lastUserInput = "";
     let repeatCount = 0;
 
@@ -305,27 +304,6 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    function isHistoryQuery(cleanText) {
-      const clean = cleanText.toLowerCase().replace(/[?!.,]/g, '').trim();
-      const phrases = [
-        "what was i doing",
-        "what were we doing",
-        "what was i talking about",
-        "what were we talking about",
-        "what was i saying",
-        "what were we saying",
-        "what did i say",
-        "what did we say",
-        "what did i talk about",
-        "what did we talk about",
-        "what was that earlier",
-        "what was that before",
-        "recap",
-        "remind me"
-      ];
-      return phrases.some(p => clean.includes(p));
-    }
-
     function initBot() {
       const name = memory.get('userName');
       const visits = (memory.get('visitCount') || 0) + 1;
@@ -341,9 +319,10 @@
     }
 
     function generateResponse(input) {
+      const rawInput = input.trim();
+      const rawLower = rawInput.toLowerCase().replace(/[?!.,]/g, '').trim();
       const normalized = normalizeText(input);
       const clean = normalized.toLowerCase().replace(/[?!.,]/g, '').trim();
-      const rawInput = input.trim();
       
       let fullName = memory.get('userName');
       let firstName = fullName ? fullName.split(" ")[0] : "";
@@ -351,6 +330,7 @@
       const useNameTag = firstName && Math.random() > 0.4;
       const nameTag = useNameTag ? `, ${firstName}` : "";
       
+      let topicHistory = memory.get('history') || [];
       const currentPrompt = lastBotPrompt;
       lastBotPrompt = "";
 
@@ -370,15 +350,16 @@
         lastUserInput = clean;
       }
 
-      // 1. History & Conversation Recall (Evaluated First)
-      if (isHistoryQuery(clean)) {
+      // 1. History & Conversation Recall (Checked directly on raw text)
+      const isHistoryCheck = /^(?:what (?:was i|were we) (?:doing|talking about|saying)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
+      if (isHistoryCheck) {
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
         } else if (topicHistory.length === 1) {
           return `Earlier you were talking about the ${topicHistory[0]}${nameTag}!`;
         } else {
           const pastList = [...new Set(topicHistory)].join(", ");
-          return `Earlier in this chat, we covered: ${pastList}${nameTag}!`;
+          return `Earlier in our chats, we covered: ${pastList}${nameTag}!`;
         }
       }
 
@@ -435,7 +416,10 @@
         const feature = extractSubject(normalized) || clean.replace(/^(it has|i got|has)\s+/i, '');
         if (feature && feature.length > 1) {
           activeFeature = feature;
-          if (!topicHistory.includes(feature)) topicHistory.push(feature);
+          if (!topicHistory.includes(feature)) {
+            topicHistory.push(feature);
+            memory.set('history', topicHistory);
+          }
           const target = currentTopic ? ` on the ${currentTopic}` : "";
           lastBotPrompt = "ask_feature_details";
           return `Nice, having ${feature}${target} sounds solid${nameTag}! What kind of stuff do you do with it?`;
@@ -478,7 +462,7 @@
 
       // 11. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing earlier?'), chain features, auto-correct typos, and store memory${nameTag}!`;
+        return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
       // 12. Identity of SBG
@@ -539,12 +523,13 @@
         return info.join(". ") + ".";
       }
 
-      // 18. Intelligent Subject Extraction with Topic Anchoring & History Logging
+      // 18. Intelligent Subject Extraction with Persistent History Logging
       const extractedSubject = extractSubject(normalized);
       if (extractedSubject && extractedSubject.length > 1) {
         currentTopic = extractedSubject;
         if (!topicHistory.includes(extractedSubject)) {
           topicHistory.push(extractedSubject);
+          memory.set('history', topicHistory);
         }
         lastBotPrompt = "ask_why_topic";
         
@@ -602,7 +587,6 @@
       lastUserInput = "";
       currentTopic = "";
       activeFeature = "";
-      topicHistory = [];
       repeatCount = 0;
     }
 
