@@ -231,7 +231,7 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma", "discussing", "pretendo", "whether"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma", "discussing", "pretendo", "whether", "released"];
 
     function normalizeText(text) {
       return text.toLowerCase().replace(/--+/g, ' ').split(/\s+/).map(word => {
@@ -357,8 +357,8 @@
       return "neutral";
     }
 
-    // Pure Wikipedia Lead Fetcher with Clean Regex Filtering
-    async function fetchWikipediaSummary(query) {
+    // Pure Wikipedia Lead Fetcher with Adaptive Date Filtering
+    async function fetchWikipediaSummary(query, wantsDateOnly = false) {
       try {
         let cleanQuery = query.trim().replace(/\s+/g, '_');
         if (cleanQuery.toLowerCase() === 'wii_u' || cleanQuery.toLowerCase() === 'wiiu') cleanQuery = 'Wii_U';
@@ -369,7 +369,6 @@
         if (cleanQuery.toLowerCase() === 'gamecube') cleanQuery = 'GameCube';
         if (cleanQuery.toLowerCase() === 'nintendo_switch' || cleanQuery.toLowerCase() === 'switch') cleanQuery = 'Nintendo_Switch';
         
-        // Fetch direct intro extract from Wikipedia
         const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(cleanQuery)}&format=json&origin=*`);
         if (!res.ok) return null;
         const data = await res.json();
@@ -382,23 +381,35 @@
         let extract = pages[pageId].extract;
         extract = extract.replace(/\[\d+\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
         
-        // Filter out multi-region date dumps
+        // Clean multi-region date dumps down to the primary launch year
         extract = extract.replace(/released in Japan on [^,]+, in North America on [^,]+, and in Europe on [^.]+/i, (match) => {
           const year = match.match(/\b(19\d\d|20\d\d)\b/);
           return year ? `originally released in ${year[0]}` : "released worldwide";
         });
 
-        // Split text into real standalone sentences
         const rawSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
+
+        // Specific release date query intent
+        if (wantsDateOnly) {
+          for (let s of rawSentences) {
+            if (/\b(?:released in|released on|launched in|launched on|first released)\b/i.test(s)) {
+              return s.trim();
+            }
+          }
+        }
+
+        // Clean rival console listings while preserving the release date clause
         const cleanedSentences = [];
-        
         for (let s of rawSentences) {
           let str = s.trim();
-          // Remove rivalry/generation filler sentences
-          if (/\b(?:generation of home consoles|competed with|competes with|ninth-generation|eighth-generation|succeeded the wii u and competed)\b/i.test(str)) {
-            continue;
+          // Remove competitor tail clauses while keeping release timing
+          str = str.replace(/;?\s*(?:it\s+)?competed with\s+[^.!?]+[.!?]/i, '.');
+          str = str.replace(/;?\s*(?:it\s+)?competes with\s+[^.!?]+[.!?]/i, '.');
+          str = str.replace(/,\s*competing with\s+[^.!?]+[.!?]/i, '.');
+          
+          if (str.length > 10) {
+            cleanedSentences.push(str);
           }
-          cleanedSentences.push(str);
         }
 
         const picked = cleanedSentences.length >= 2 ? cleanedSentences.slice(0, 2) : rawSentences.slice(0, 2);
@@ -474,7 +485,21 @@
         lastUserInput = clean;
       }
 
-      // 1. Launch Game Inquiry Matcher
+      // 1. Release Date Specific Question
+      const dateQueryMatch = clean.match(/^(?:when was|when did)\s+(?:the\s+)?([^,?!.]+?)\s+(?:released|come out|launch|launched)/i);
+      if (dateQueryMatch && dateQueryMatch[1]) {
+        const queryTerm = dateQueryMatch[1].trim();
+        const dateSummary = await fetchWikipediaSummary(queryTerm, true);
+        if (dateSummary) {
+          return pickRandom([
+            `According to the records: ${dateSummary}`,
+            `Looked up the launch date${nameTag}! ${dateSummary}`,
+            `Here's when it launched: ${dateSummary}`
+          ]);
+        }
+      }
+
+      // 2. Launch Game Inquiry Matcher
       if (/(?:launch games?|launch titles?|what games did it launch with|what was its launch game)/i.test(clean)) {
         const consoleKey = extractConsole(clean) || contextStack.topic || "switch";
         const key = consoleKey.toLowerCase();
@@ -483,7 +508,7 @@
         }
       }
 
-      // 2. Wikipedia Direct Query Intent
+      // 3. Wikipedia Direct Query Intent
       const wikiQueryMatch = clean.match(/^(?:what(?:'s|s| is)?(?:\s+an?|\s+the)?|who(?:'s|s| is| was)?(?:\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define)\s+(.+)/i);
       if (wikiQueryMatch && wikiQueryMatch[1]) {
         const queryTerm = wikiQueryMatch[1].replace(/^(?:the|a|an)\s+/i, '').trim();
@@ -499,7 +524,7 @@
         }
       }
 
-      // 3. Compound Sentence & Multi-Clause Intent Engine
+      // 4. Compound Sentence & Multi-Clause Intent Engine
       const compoundSplit = rawInput.split(/\s+(?:and(?:\s+i)?|also(?:\s+i)?|plus(?:\s+i)?|then(?:\s+i)?|but(?:\s+i)?)\s+/i);
       if (compoundSplit.length >= 2) {
         const clause1 = compoundSplit[0].trim();
@@ -527,7 +552,7 @@
         }
       }
 
-      // 4. History & Conversation Recall
+      // 5. History & Conversation Recall
       const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|done|talking about|talked about|talk about|saying|said|discussed|covered)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
@@ -540,7 +565,7 @@
         }
       }
 
-      // 5. Single-letter Ignore
+      // 6. Single-letter Ignore
       if (clean.length <= 1) {
         return pickRandom([
           `Just one letter? Type out a word${nameTag}!`,
@@ -549,7 +574,7 @@
         ]);
       }
 
-      // 6. Frustration / Outbursts
+      // 7. Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -560,7 +585,7 @@
         ]);
       }
 
-      // 7. Memory Factoid Storage
+      // 8. Memory Factoid Storage
       const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const factText = rememberMatch[1].trim();
@@ -592,7 +617,7 @@
         return info.join(". ") + ".";
       }
 
-      // 8. Directional Echos
+      // 9. Directional Echos
       if (/^(?:your|my)\s+(?:end|side)\b/i.test(clean)) {
         return pickRandom([
           `Just everything on my side! Code, memory, and logic are running smooth${nameTag}.`,
@@ -601,7 +626,7 @@
         ]);
       }
 
-      // 9. Status Return
+      // 10. Status Return
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
         contextStack.questionState = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
@@ -618,7 +643,7 @@
         ]);
       }
 
-      // 10. Positive Acknowledgements
+      // 11. Positive Acknowledgements
       if (/^(?:that(?:'s|s)?|it(?:'s|s)?|sounds?)\s+(?:good|great|cool|awesome|dope|nice|solid|valid|fair)\b/i.test(clean)) {
         return pickRandom([
           `Glad to hear it${nameTag}! What's next on your mind?`,
@@ -629,7 +654,7 @@
         ]);
       }
 
-      // 11. Inquiries & Deflections
+      // 12. Inquiries & Deflections
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return pickRandom([
           `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`,
@@ -670,7 +695,7 @@
         ]);
       }
 
-      // 12. Detected Feature / Sub-Topic on Active Context
+      // 13. Detected Feature / Sub-Topic on Active Context
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         contextStack.subTopic = detectedFeature;
@@ -700,7 +725,7 @@
         ]);
       }
 
-      // 13. Activity Updates
+      // 14. Activity Updates
       const isStatusOnly = /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:doing\s+)?(?:great|good|fine|well|alright|ok|okay)$/i.test(clean);
       if (!isStatusOnly && /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i.test(clean)) {
         const activityMatch = clean.match(/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i);
@@ -714,7 +739,7 @@
         }
       }
 
-      // 14. Feature Details
+      // 15. Feature Details
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         contextStack.questionState = "ask_homebrew_apps";
         return pickRandom([
@@ -724,7 +749,7 @@
         ]);
       }
 
-      // 15. Vague Quantity Answers
+      // 16. Vague Quantity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentQuestionState === "ask_feature_details") {
           contextStack.questionState = "ask_specific_app";
@@ -743,7 +768,7 @@
         }
       }
 
-      // 16. Disagreements
+      // 17. Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentQuestionState === "echo_check") {
           return pickRandom([
@@ -759,7 +784,7 @@
         ]);
       }
 
-      // 17. Positive Status
+      // 18. Positive Status
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentQuestionState === "general_greeting" || currentQuestionState === "ask_how_are_you") {
           return pickRandom([
@@ -779,7 +804,7 @@
         }
       }
 
-      // 18. Topic Reasons
+      // 19. Topic Reasons
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
         if (contextStack.topic) {
           contextStack.questionState = "ask_favorite_feature";
@@ -796,7 +821,7 @@
         }
       }
 
-      // 19. Name Recall
+      // 20. Name Recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName 
           ? pickRandom([
@@ -807,7 +832,7 @@
           : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 20. Name Extraction
+      // 21. Name Extraction
       const isActivityPhrase = /^(?:up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
@@ -834,7 +859,7 @@
         ]);
       }
 
-      // 21. Negative Status
+      // 22. Negative Status
       if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean) || contextStack.sentiment === "negative") {
         return pickRandom([
           `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
@@ -843,7 +868,7 @@
         ]);
       }
 
-      // 22. Natural Short Acknowledgements
+      // 23. Natural Short Acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
           `Gotcha! What's next on your mind${nameTag}?`,
@@ -854,12 +879,12 @@
         ]);
       }
 
-      // 23. Help & Commands
+      // 24. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: lookup launch titles, fetch Wikipedia overviews ('whats the switch?'), parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
+        return `Here's what I can do: lookup release dates, launch titles, fetch Wikipedia overviews ('whats the wii u?'), parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
       }
 
-      // 24. Identity
+      // 25. Identity
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
@@ -867,7 +892,7 @@
         ]);
       }
 
-      // 25. Greetings
+      // 26. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -878,7 +903,7 @@
         ]);
       }
 
-      // 26. Feelings
+      // 27. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         return pickRandom([
@@ -888,7 +913,7 @@
         ]);
       }
 
-      // 27. Context Stack Engine: Single Subject & Console Extraction
+      // 28. Context Stack Engine: Single Subject & Console Extraction
       const extractedSubject = extractSubject(rawInput);
       if (extractedSubject && extractedSubject.length > 1) {
         const subKey = extractedSubject.toLowerCase();
@@ -939,14 +964,14 @@
         ]);
       }
 
-      // 28. Memory Anchors
+      // 29. Memory Anchors
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 29. Clean Fallbacks
+      // 30. Clean Fallbacks
       return pickRandom([
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
