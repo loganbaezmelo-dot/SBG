@@ -179,7 +179,6 @@
     let lastUserInput = "";
     let repeatCount = 0;
 
-    // Common Typo Normalizer Dictionary
     const typoMap = {
       "doimg": "doing",
       "hwy": "hey",
@@ -203,7 +202,6 @@
       "u": "you"
     };
 
-    // Calculate edit distance to catch off-by-one typos automatically
     function getLevenshtein(a, b) {
       if (!a.length) return b.length;
       if (!b.length) return a.length;
@@ -222,14 +220,13 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah"];
 
     function normalizeText(text) {
       return text.toLowerCase().split(/\s+/).map(word => {
         const cleanWord = word.replace(/[^\w]/gi, '');
         if (typoMap[cleanWord]) return typoMap[cleanWord];
 
-        // Fuzzy match if edit distance is 1 for words longer than 3 chars
         if (cleanWord.length > 3) {
           for (let target of vocabulary) {
             if (getLevenshtein(cleanWord, target) === 1) {
@@ -251,7 +248,7 @@
       "both", "each", "few", "more", "most", "other", "such", "no", "nor",
       "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna",
       "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
-      "what", "whats", "what's", "who", "whos", "who's", "tell"
+      "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye"
     ]);
 
     function formatName(raw) {
@@ -353,9 +350,11 @@
         return `Nice to meet you, ${parsedName}! I've logged that in my memory.`;
       }
 
-      // 3. Positive Status (Catches typos like "doimg good", "pretty gud", etc.)
-      if (/^(good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
-        if (currentPrompt === "ask_how_are_you" || currentPrompt === "general_greeting") {
+      // 3. Positive Status / Agreements (Catches "yeah", "yup", "good", "doing good", etc.)
+      if (/^(yeah|yea|yep|yup|ye|good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
+        if (currentPrompt === "general_greeting") {
+          return `Awesome! So what are we getting into today${nameTag}?`;
+        } else if (currentPrompt === "ask_how_are_you") {
           const replies = [
             `Glad to hear that${nameTag}! What are you working on today?`,
             `Awesome${nameTag}. What's next on the agenda?`,
@@ -399,7 +398,7 @@
         return acks[Math.floor(Math.random() * acks.length)];
       }
 
-      // 8. Greetings (Catches "hwy", "hw", "hello")
+      // 8. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         lastBotPrompt = "ask_how_are_you";
         const greetings = [
