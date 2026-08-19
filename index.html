@@ -227,10 +227,10 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma", "discussing"];
 
     function normalizeText(text) {
-      return text.toLowerCase().split(/\s+/).map(word => {
+      return text.toLowerCase().replace(/--+/g, ' ').split(/\s+/).map(word => {
         const cleanWord = word.replace(/[^\w-]/gi, '');
         if (typoMap[cleanWord]) return typoMap[cleanWord];
 
@@ -257,10 +257,11 @@
       "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
       "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye",
       "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus",
-      "earlier", "before", "talking", "talked", "mention", "mentioned", "wait", "covered", "discussed",
+      "earlier", "before", "talking", "talked", "mention", "mentioned", "wait", "covered", "discussed", "discussing", "discuss",
       "stuff", "things", "lot", "lots", "bunch", "everything", "anything", "something",
       "use", "using", "uses", "gives", "giving", "gave", "got", "give", "access", "part", "coolest", "best",
       "know", "knowing", "knows", "knew", "think", "thinking", "thinks", "thought", "troubling", "trouble", "matter", "mattered",
+      "ask", "asking", "asked",
       "fuck", "shit", "damn", "crap", "hell", "bruh", "wtf", "lmao", "lol"
     ]);
 
@@ -270,9 +271,10 @@
 
     function cleanSubjectText(text) {
       return text
-        .replace(/^(?:the|a|an|also|my|your|some|use|using|i use|i have|i got|it has|it got|have)\s+/i, '')
-        .replace(/\s+(?:on it|with it|installed|loaded|running|on my wii u|on the wii u)$/i, '')
-        .replace(/[?!.,]/g, '')
+        .replace(/--+/g, ' ')
+        .replace(/^(?:the|a|an|also|my|your|some|use|using|i use|i have|i got|it has|it got|have|discussing|talking about)\s+/i, '')
+        .replace(/\s+(?:on it|with it|installed|loaded|running|on my wii u|on the wii u|not me|not you)$/i, '')
+        .replace(/[^a-zA-Z0-9\s_-]/g, '')
         .trim();
     }
 
@@ -308,6 +310,7 @@
       }
 
       const cleanTokens = sentence
+        .replace(/--+/g, ' ')
         .replace(/[^\w\s-]/gi, '')
         .split(/\s+/)
         .filter(w => !stopWords.has(w.toLowerCase()) && (w.length > 1 || w.toLowerCase() === 'u'));
@@ -345,9 +348,9 @@
 
     function generateResponse(input) {
       const rawInput = input.trim();
-      const rawLower = rawInput.toLowerCase().replace(/[?!.,]/g, '').trim();
+      const rawLower = rawInput.toLowerCase().replace(/--+/g, ' ').replace(/[?!.,]/g, '').trim();
       const normalized = normalizeText(input);
-      const clean = normalized.toLowerCase().replace(/[?!.,]/g, '').trim();
+      const clean = normalized.toLowerCase().replace(/--+/g, ' ').replace(/[?!.,]/g, '').trim();
       
       let fullName = memory.get('userName');
       let firstName = fullName ? fullName.split(" ")[0] : "";
@@ -404,9 +407,17 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Robust Inquiry / Philosophical / Question Deflection Handlers
+      // 4. Inquiries / Deflections / Therapeutic Patterns
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`;
+      }
+
+      if (/^(?:we were discussing you|talking about you|not me|focus on you|this is about you)/i.test(clean)) {
+        return `Fair point${nameTag}, but I'm just an AI engine running here! Let's get back to what you're working on—what's on your mind?`;
+      }
+
+      if (/^(?:why do you ask|why are you asking)\b/i.test(clean)) {
+        return `Just trying to keep the conversation flowing${nameTag}! What were you thinking?`;
       }
 
       if (/^(?:what if|suppose|supposing|imagine if)\b/i.test(clean)) {
