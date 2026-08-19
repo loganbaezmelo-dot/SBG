@@ -269,26 +269,29 @@
 
     function cleanSubjectText(text) {
       return text
-        .replace(/^(?:the|a|an|also|my|your|some|use|using|i use|i have|i got)\s+/i, '')
+        .replace(/^(?:the|a|an|also|my|your|some|use|using|i use|i have|i got|it has|it got|have)\s+/i, '')
         .replace(/\s+(?:on it|with it|installed|loaded|running|on my wii u|on the wii u)$/i, '')
         .replace(/[?!.,]/g, '')
         .trim();
     }
 
+    function extractConsole(sentence) {
+      const match = sentence.match(/\b(wii\s+u|wii|ps1|ps2|ps3|ps4|ps5|xbox\s+360|xbox\s+one|xbox|switch|3ds|ds|psp|ps\s*vita)\b/i);
+      return match ? match[1].toLowerCase().trim() : null;
+    }
+
+    function extractFeature(sentence) {
+      const match = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|homebrew|cfw|pretendo|loadiine|nintendont)\b/i);
+      return match ? match[1].toLowerCase().trim() : null;
+    }
+
     function extractSubject(sentence) {
-      // Specific multi-word console detection
-      const consoleMatch = sentence.match(/\b(wii\s+u|wii|ps1|ps2|ps3|ps4|ps5|xbox\s+360|xbox\s+one|xbox|switch|3ds|ds|psp|ps\s*vita)\b/i);
-      if (consoleMatch) {
-        return consoleMatch[1].toLowerCase().trim();
-      }
+      const c = extractConsole(sentence);
+      if (c) return c;
 
-      // Feature extraction (e.g. aroma, payload loader, homebrew)
-      const featureMatch = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|homebrew|cfw|pretendo|loadiine)\b/i);
-      if (featureMatch) {
-        return featureMatch[1].toLowerCase().trim();
-      }
+      const f = extractFeature(sentence);
+      if (f) return f;
 
-      // Direct phrase extraction
       const phrasePatterns = [
         /(?:i have an?|i have|i got an?|i got|i bought an?|i bought)\s+([^,?!]+)/i,
         /(?:i use|i run|it has|it got)\s+([a-zA-Z0-9_-]+(?:\s+and\s+[a-zA-Z0-9_-]+)?)/i,
@@ -303,7 +306,6 @@
         }
       }
 
-      // Fallback token parsing
       const cleanTokens = sentence
         .replace(/[^\w\s-]/gi, '')
         .split(/\s+/)
@@ -401,19 +403,17 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Direct Feature Identification on an Active Topic
-      if (/^(?:i have|i use|i run|it has|it got)\s+([a-zA-Z0-9_-]+(?:\s+and\s+[a-zA-Z0-9_-]+)?)\s*(?:on it|installed|loaded)?/i.test(clean)) {
-        const candidate = cleanSubjectText(clean);
-        if (candidate && candidate.length > 1 && !stopWords.has(candidate)) {
-          activeFeature = candidate;
-          if (!topicHistory.includes(candidate)) {
-            topicHistory.push(candidate);
-            memory.set('history', topicHistory);
-          }
-          const target = currentTopic ? ` on the ${currentTopic}` : "";
-          lastBotPrompt = "ask_feature_details";
-          return `Nice, running ${candidate}${target} is solid${nameTag}! What kind of stuff do you do with it?`;
+      // 4. Detected Known Feature on Existing Topic (e.g. "It has aroma", "I use aroma on it")
+      const detectedFeature = extractFeature(rawLower);
+      if (detectedFeature) {
+        activeFeature = detectedFeature;
+        if (!topicHistory.includes(detectedFeature)) {
+          topicHistory.push(detectedFeature);
+          memory.set('history', topicHistory);
         }
+        const target = currentTopic ? ` on the ${currentTopic}` : "";
+        lastBotPrompt = "ask_feature_details";
+        return `Nice, running ${detectedFeature}${target} is solid${nameTag}! What kind of stuff do you do with it?`;
       }
 
       // 5. Feature Details / Explanation Handler
@@ -572,12 +572,11 @@
         }
         lastBotPrompt = "ask_why_topic";
         
-        const titleCaseSubject = extractedSubject.charAt(0).toUpperCase() + extractedSubject.slice(1);
         const subjectQuestions = [
           `What got you interested in the ${extractedSubject}${nameTag}?`,
           `What about the ${extractedSubject} are you thinking about${nameTag}?`,
           `What do you want to do with the ${extractedSubject}${nameTag}?`,
-          `${titleCaseSubject}? Tell me more about that${nameTag}.`
+          `Tell me more about your ${extractedSubject}${nameTag}!`
         ];
         return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
       }
@@ -634,3 +633,4 @@
   </script>
 </body>
 </html>
+
