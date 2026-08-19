@@ -200,7 +200,6 @@
       "grt": "great",
       "plz": "please",
       "pls": "please",
-      "ur": "your",
       "truw": "true",
       "trur": "true",
       "becuase": "because",
@@ -260,7 +259,7 @@
       "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus",
       "earlier", "before", "talking", "talked", "mention", "mentioned", "wait",
       "stuff", "things", "lot", "lots", "bunch", "everything", "anything",
-      "use", "using", "uses", "gives", "giving", "gives", "gave", "got", "give", "access", "part", "coolest", "best",
+      "use", "using", "uses", "gives", "giving", "gave", "got", "give", "access", "part", "coolest", "best",
       "fuck", "shit", "damn", "crap", "hell", "bruh", "wtf", "lmao", "lol"
     ]);
 
@@ -273,8 +272,16 @@
     }
 
     function extractSubject(sentence) {
+      // 1. Specific multi-word console / platform capture
+      const consoleMatch = sentence.match(/\b(wii\s+u|wii|ps1|ps2|ps3|ps4|ps5|xbox\s+360|xbox\s+one|xbox|switch|3ds|ds|psp|ps\s*vita)\b/i);
+      if (consoleMatch) {
+        return consoleMatch[1].toLowerCase().trim();
+      }
+
+      // 2. Direct phrase extraction
       const phrasePatterns = [
-        /(?:i use|i run|i have|i got|it has|it got)\s+([a-zA-Z0-9_-]+(?:\s+and\s+[a-zA-Z0-9_-]+)?)/i,
+        /(?:i have an?|i have|i got an?|i got|i bought an?|i bought)\s+([^,?!]+)/i,
+        /(?:i use|i run|it has|it got)\s+([a-zA-Z0-9_-]+(?:\s+and\s+[a-zA-Z0-9_-]+)?)/i,
         /(?:i wanna do some|i want to play|i wanna play|i want|tell me about|thinking about|what about)\s+(.+)/i
       ];
 
@@ -286,10 +293,11 @@
         }
       }
 
+      // 3. Fallback token parsing
       const cleanTokens = sentence
         .replace(/[^\w\s-]/gi, '')
         .split(/\s+/)
-        .filter(w => !stopWords.has(w.toLowerCase()) && w.length > 1);
+        .filter(w => !stopWords.has(w.toLowerCase()) && (w.length > 1 || w.toLowerCase() === 'u'));
 
       if (cleanTokens.length > 0 && cleanTokens.length <= 3) {
         const candidate = cleanTokens.join(" ");
@@ -383,13 +391,13 @@
         return curseReplies[Math.floor(Math.random() * curseReplies.length)];
       }
 
-      // 4. Feature Details / Explanation Handler (e.g. "The coolest part is that it gives access...")
+      // 4. Feature Details / Explanation Handler
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         lastBotPrompt = "ask_homebrew_apps";
         return `Having full system access is huge${nameTag}! What homebrew apps or plugins are you running on it?`;
       }
 
-      // 5. Vague Quantity / Activity Answers (e.g. "a lot of stuff")
+      // 5. Vague Quantity / Activity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentPrompt === "ask_feature_details") {
           lastBotPrompt = "ask_specific_app";
@@ -400,9 +408,9 @@
         }
       }
 
-      // 6. Direct Feature Identification (e.g. "I use payload-loader and aroma")
-      if (/^(?:i use|i run|it has|i got)\s+(payload-loader|aroma|homebrew|cfw|pretendo)/i.test(clean)) {
-        const match = clean.match(/(?:i use|i run|it has|i got)\s+(.+)/i);
+      // 6. Direct Feature Identification
+      if (/^(?:i use|i run|it has|it got)\s+(payload-loader|aroma|homebrew|cfw|pretendo)/i.test(clean)) {
+        const match = clean.match(/(?:i use|i run|it has|it got)\s+(.+)/i);
         const feature = match ? match[1].trim() : "that setup";
         activeFeature = feature;
         if (!topicHistory.includes(feature)) {
@@ -544,7 +552,7 @@
       }
 
       // 20. Intelligent Subject Extraction with Persistent History Logging
-      const extractedSubject = extractSubject(normalized);
+      const extractedSubject = extractSubject(rawLower);
       if (extractedSubject && extractedSubject.length > 1) {
         currentTopic = extractedSubject;
         if (!topicHistory.includes(extractedSubject)) {
@@ -557,7 +565,7 @@
           `What got you interested in the ${extractedSubject}${nameTag}?`,
           `What about the ${extractedSubject} are you thinking about${nameTag}?`,
           `What do you want to do with the ${extractedSubject}${nameTag}?`,
-          `${extractedSubject.charAt(0).toUpperCase() + extractedSubject.slice(1)}? Tell me more about that${nameTag}.`
+          `${extractedSubject.toUpperCase()}? Tell me more about that${nameTag}.`
         ];
         return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
       }
