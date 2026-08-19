@@ -306,6 +306,7 @@
     }
 
     function isHistoryQuery(cleanText) {
+      const clean = cleanText.toLowerCase().replace(/[?!.,]/g, '').trim();
       const phrases = [
         "what was i doing",
         "what were we doing",
@@ -322,7 +323,7 @@
         "recap",
         "remind me"
       ];
-      return phrases.some(p => cleanText.includes(p));
+      return phrases.some(p => clean.includes(p));
     }
 
     function initBot() {
@@ -369,7 +370,7 @@
         lastUserInput = clean;
       }
 
-      // 1. History & Conversation Recall
+      // 1. History & Conversation Recall (Evaluated First)
       if (isHistoryQuery(clean)) {
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
