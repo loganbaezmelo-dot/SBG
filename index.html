@@ -171,25 +171,44 @@
     const userInput = document.getElementById('user-input');
     let lastFallback = "";
 
-    function reflect(text) {
-      const reflections = {
-        "i am": "you are",
-        "i was": "you were",
-        "i": "you",
-        "me": "you",
-        "my": "your",
-        "myself": "yourself",
-        "you are": "I am",
-        "you were": "I was",
-        "you": "me",
-        "your": "my",
-        "yours": "mine"
-      };
+    // Stop words (filler, verbs, prepositions, articles) to isolate key nouns/subjects
+    const stopWords = new Set([
+      "i", "me", "my", "myself", "we", "our", "you", "your", "he", "she", "it", "they",
+      "wanna", "want", "do", "some", "like", "love", "hate", "play", "make", "get", "go",
+      "have", "has", "had", "can", "could", "should", "would", "is", "are", "was", "were",
+      "a", "an", "the", "this", "that", "these", "those", "to", "for", "with", "about",
+      "of", "at", "in", "on", "by", "from", "up", "down", "out", "over", "under", "again",
+      "then", "once", "here", "there", "when", "where", "why", "how", "all", "any",
+      "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor",
+      "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna"
+    ]);
 
-      return text
+    function extractSubject(sentence) {
+      // 1. Check common phrase prefixes first
+      const phrasePatterns = [
+        /(?:i wanna do some|i want to play|i wanna play|i like|i love|tell me about|thinking about|what about)\s+(.+)/i,
+        /(?:how about|lets talk about|let's talk about|can we do)\s+(.+)/i
+      ];
+
+      for (let pattern of phrasePatterns) {
+        const match = sentence.match(pattern);
+        if (match && match[1]) {
+          return match[1].replace(/[?!.,]/g, '').trim();
+        }
+      }
+
+      // 2. Token filter logic: filter out stop-words to isolate the subject
+      const cleanTokens = sentence
+        .replace(/[^\w\s]/gi, '')
         .split(/\s+/)
-        .map(word => reflections[word.toLowerCase()] || word)
-        .join(" ");
+        .filter(w => w.length > 1 && !stopWords.has(w.toLowerCase()));
+
+      if (cleanTokens.length > 0) {
+        // Return remaining subject terms (e.g. "nintendo")
+        return cleanTokens.join(" ");
+      }
+
+      return null;
     }
 
     function appendMessage(text, sender) {
@@ -206,7 +225,7 @@
       memory.set('visitCount', visits);
 
       if (name) {
-        appendMessage(`Welcome back, ${name}! Good to see you again. What's on your mind?`, 'bot');
+        appendMessage(`Welcome back! Good to see you again. What's on your mind?`, 'bot');
       } else {
         appendMessage("Hey! I'm SBG (Simulated But Good). What's your name?", 'bot');
       }
@@ -215,6 +234,7 @@
     function generateResponse(input) {
       const clean = input.toLowerCase().trim();
       let name = memory.get('userName');
+      const nameTag = name ? `, ${name}` : "";
 
       // 1. Name Extraction / Learning
       const nameMatch = clean.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z]+)/i);
@@ -224,7 +244,6 @@
         return `Got it! I'll remember that your name is ${detectedName}.`;
       }
 
-      // If user just types a single word response when we don't have their name yet
       if (!name && clean.split(" ").length === 1 && clean.length > 1) {
         const singleName = clean.charAt(0).toUpperCase() + clean.slice(1);
         memory.set('userName', singleName);
@@ -238,22 +257,22 @@
 
       // 3. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return "Here's what I can do: remember your name and facts ('remember that...'), recall stored info ('what do you remember'), hold conversations, reflect statements, and keep local memory across refreshes!";
+        return `Here's what I can do: remember facts ('remember that...'), extract topics, hold conversations, recall info, and store memory${nameTag}!`;
       }
 
       // 4. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
-        return "I'm SBG: Simulated But Good! A classic symbolic AI with persistent memory and deterministic logic.";
+        return `I'm SBG: Simulated But Good! A symbolic AI with persistent memory and deterministic logic${nameTag}.`;
       }
 
       // 5. Short acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|fs|facts|word|lol|lmao|gotcha)\b/i.test(clean)) {
         const acks = [
-          "Yep!",
-          "Sounds good.",
-          "Gotcha.",
-          "For sure.",
-          "Cool cool."
+          `Yep${nameTag}!`,
+          `Sounds good${nameTag}.`,
+          `Gotcha${nameTag}.`,
+          `For sure${nameTag}.`,
+          `Cool cool${nameTag}.`
         ];
         return acks[Math.floor(Math.random() * acks.length)];
       }
@@ -261,22 +280,22 @@
       // 6. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         const greetings = [
-          name ? `Hey ${name}! How's it going?` : "Hello there! How's your day going?",
-          "Yo! What are we working on today?",
-          name ? `What's up, ${name}!` : "Hey! What's new?"
+          `Hello there! How's your day going${nameTag}?`,
+          `Yo! What are we working on today${nameTag}?`,
+          `Hey! What's new${nameTag}?`
         ];
         return greetings[Math.floor(Math.random() * greetings.length)];
       }
 
       // 7. Status / How are you
       if (clean.includes("how are you") || clean.includes("how r u")) {
-        return "Running smoothly at 60 FPS in your browser cache! How about yourself?";
+        return `Running smoothly at 60 FPS in your browser cache! How about yourself${nameTag}?`;
       }
 
-      // 8. Feelings (ELIZA style)
+      // 8. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
-        return `Why do you feel ${feelMatch[1]}? Does that happen often?`;
+        return `Why do you feel ${feelMatch[1]}? Does that happen often${nameTag}?`;
       }
 
       // 9. Memory Factoid System
@@ -285,7 +304,7 @@
         const facts = memory.get('facts') || [];
         facts.push(rememberMatch[1]);
         memory.set('facts', facts);
-        return `Stored in memory: "${rememberMatch[1]}"!`;
+        return `Stored in memory: "${rememberMatch[1]}"${nameTag}!`;
       }
 
       if (clean.includes("what do you remember") || clean.includes("what do you know about me")) {
@@ -297,21 +316,33 @@
         return info.join(". ") + ".";
       }
 
-      // 10. Non-Repeating Fallbacks + Context anchors
+      // 10. Intelligent Subject Extraction & Inquisitive Responses
+      const extractedSubject = extractSubject(input);
+      if (extractedSubject && extractedSubject.length > 1) {
+        const subjectQuestions = [
+          `What about ${extractedSubject} are you thinking about${nameTag}?`,
+          `What do you want to do with ${extractedSubject}${nameTag}?`,
+          `${extractedSubject.charAt(0).toUpperCase() + extractedSubject.slice(1)}? Tell me more about that${nameTag}.`,
+          `What got you interested in ${extractedSubject}${nameTag}?`
+        ];
+        return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
+      }
+
+      // 11. Context Anchors from Past Memories
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
-        return `That reminds me... earlier you mentioned that ${randomFact}. Is that related?`;
+        return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
+      // 12. Non-Repeating Fallbacks
       const fallbacks = [
-        "Interesting point. Tell me more about that.",
-        "I'm simulated, but that sounds legit.",
-        name ? `That's classic, ${name}.` : "I hear you.",
-        "Storing that thought in volatile RAM.",
-        "Fair enough!",
-        "Got any other facts for me to remember?",
-        "Tell me more about what you're thinking."
+        `Interesting point. Tell me more about that${nameTag}.`,
+        `I'm simulated, but that sounds legit${nameTag}.`,
+        `Storing that thought in volatile RAM${nameTag}.`,
+        `Fair enough${nameTag}!`,
+        `Got any other facts for me to remember${nameTag}?`,
+        `Tell me more about what you're thinking${nameTag}.`
       ];
 
       const availableFallbacks = fallbacks.filter(f => f !== lastFallback);
