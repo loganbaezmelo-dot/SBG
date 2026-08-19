@@ -306,14 +306,23 @@
     }
 
     function isHistoryQuery(cleanText) {
-      const historyPatterns = [
-        /(?:what (?:was i|were we) (?:talking|saying|doing|discussing|bringing up))/i,
-        /(?:what did (?:i|we) (?:say|talk about|mention|do|discuss))/i,
-        /(?:wait (?:what was|what were) (?:i|we) (?:talking|doing|saying))/i,
-        /(?:remind me what (?:i was|we were) (?:talking|saying|doing))/i,
-        /(?:what was that earlier|what was i on about|recap our chat|recap conversation|conversation recap)/i
+      const phrases = [
+        "what was i doing",
+        "what were we doing",
+        "what was i talking about",
+        "what were we talking about",
+        "what was i saying",
+        "what were we saying",
+        "what did i say",
+        "what did we say",
+        "what did i talk about",
+        "what did we talk about",
+        "what was that earlier",
+        "what was that before",
+        "recap",
+        "remind me"
       ];
-      return historyPatterns.some(pattern => pattern.test(cleanText));
+      return phrases.some(p => cleanText.includes(p));
     }
 
     function initBot() {
@@ -360,7 +369,7 @@
         lastUserInput = clean;
       }
 
-      // 1. Robust History & Conversation Recall
+      // 1. History & Conversation Recall
       if (isHistoryQuery(clean)) {
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
@@ -468,7 +477,7 @@
 
       // 11. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I talking about earlier?'), chain features, auto-correct typos, and store memory${nameTag}!`;
+        return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I doing earlier?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
       // 12. Identity of SBG
