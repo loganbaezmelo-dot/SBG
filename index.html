@@ -434,6 +434,23 @@
       }
     }
 
+    function splitIntoSentences(text) {
+      // Protect decimals like 3.9 billion or 2.0
+      let protectedText = text.replace(/(\d)\.(\d)/g, '$1__DOT__$2');
+      // Protect common abbreviations
+      protectedText = protectedText.replace(/\b(Mr|Mrs|Ms|Dr|e\.g|i\.e|vs|approx)\./gi, '$1__ABBRDOT__');
+
+      // Split cleanly on true sentence boundaries
+      let matches = protectedText.match(/[^.!?]+[.!?]+(?:\s|$)/g) || [protectedText];
+
+      return matches.map(s => {
+        return s
+          .replace(/__DOT__/g, '.')
+          .replace(/__ABBRDOT__/g, '.')
+          .trim();
+      });
+    }
+
     async function fetchWikipediaSummary(query, mode = "general") {
       try {
         let cleanQuery = query.trim();
@@ -472,7 +489,6 @@
         let pageData = pages[pageId];
         let extract = pageData.extract;
 
-        // Disambiguation check: if it's a disambiguation page, follow the most specific search result
         const isDisambig = pageData.pageprops && pageData.pageprops.disambiguation !== undefined || 
                            /\b(?:may refer to:|most commonly refers to:)\b/i.test(extract);
         
@@ -490,7 +506,6 @@
           }
         }
         
-        // Clean out brackets, parentheses, MediaWiki magic words, and fix spacing
         extract = extract
           .replace(/\[\d+\]/g, '')
           .replace(/\([^)]*\)/g, '')
@@ -504,7 +519,7 @@
           return year ? `originally released in ${year[0]}` : "released worldwide";
         });
 
-        const rawSentences = extract.match(/[^.!?]+[.!?]+/g) || [extract];
+        const rawSentences = splitIntoSentences(extract);
 
         if (mode === "date") {
           for (let s of rawSentences) {
