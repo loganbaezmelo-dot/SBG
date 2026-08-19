@@ -28,14 +28,17 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
-      padding: 16px;
+      height: 100dvh;
+      padding: 8px;
+      overflow: hidden;
     }
 
     .chat-container {
       background: var(--card);
       width: 100%;
       max-width: 600px;
-      height: 90vh;
+      height: 100%;
+      max-height: 100dvh;
       border-radius: 12px;
       display: flex;
       flex-direction: column;
@@ -44,15 +47,16 @@
     }
 
     header {
-      padding: 16px;
+      padding: 14px 16px;
       border-bottom: 1px solid #334155;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-shrink: 0;
     }
 
     header h1 {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       letter-spacing: 0.5px;
     }
@@ -102,6 +106,7 @@
       gap: 8px;
       background: #0f172a;
       border-top: 1px solid #334155;
+      flex-shrink: 0;
     }
 
     input {
@@ -141,9 +146,9 @@
     <header>
       <div>
         <span class="status-dot"></span>
-        <span>SBG (Simulated But Good)</span>
+        <span style="font-weight: 600;">SBG (Simulated But Good)</span>
       </div>
-      <button onclick="clearMemory()" style="padding: 4px 8px; font-size: 0.75rem; background: #ef4444;">Reset Memory</button>
+      <button onclick="clearMemory()" style="padding: 6px 10px; font-size: 0.75rem; background: #ef4444; border-radius: 6px;">Reset Memory</button>
     </header>
 
     <div class="messages" id="messages"></div>
@@ -243,19 +248,18 @@
       let fullName = memory.get('userName');
       let firstName = fullName ? fullName.split(" ")[0] : "";
       
-      // Randomly decide whether to attach the name tag (about 50% of the time so it doesn't get repetitive)
-      const useNameTag = firstName && Math.random() > 0.5;
+      const useNameTag = firstName && Math.random() > 0.4;
       const nameTag = useNameTag ? `, ${firstName}` : "";
       
       const currentPrompt = lastBotPrompt;
       lastBotPrompt = "";
 
-      // 1. Asking about name recall (Replies with FULL name)
+      // 1. Asking about name recall (Replies with full name)
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName ? `Your name is ${fullName}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 2. Name Extraction / Learning (Matches full names)
+      // 2. Name Extraction / Learning (Supports full multi-word names)
       const nameMatch = rawInput.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)/i);
       if (nameMatch && nameMatch[1]) {
         const parsedName = formatName(nameMatch[1]);
