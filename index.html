@@ -178,6 +178,7 @@
     let lastBotPrompt = "";
     let currentTopic = ""; 
     let activeFeature = ""; 
+    let topicHistory = []; // Tracks all discussion topics chronologically
     let lastUserInput = "";
     let repeatCount = 0;
 
@@ -257,7 +258,8 @@
       "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna",
       "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk",
       "what", "whats", "what's", "who", "whos", "who's", "tell", "yeah", "yea", "yep", "yup", "ye",
-      "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus"
+      "true", "real", "fr", "facts", "truth", "cause", "because", "since", "reason", "also", "plus",
+      "earlier", "before", "talking", "talked", "mention", "mentioned"
     ]);
 
     function formatName(raw) {
@@ -345,7 +347,19 @@
         lastUserInput = clean;
       }
 
-      // 1. Negative Disagreements ("no", "nah", "nope", "not really")
+      // 1. History & Conversation Recall ("What was I talking about earlier", "What did we talk about")
+      if (/(?:what (?:was i|were we) talking about|what did (?:i|we) (?:say|talk about)|recap|earlier|before)/i.test(clean)) {
+        if (topicHistory.length === 0) {
+          return `We haven't brought up specific topics yet${nameTag}! What's on your mind?`;
+        } else if (topicHistory.length === 1) {
+          return `Earlier you were talking about ${topicHistory[0]}${nameTag}!`;
+        } else {
+          const pastList = [...new Set(topicHistory)].join(", ");
+          return `Earlier in this chat, we covered: ${pastList}${nameTag}!`;
+        }
+      }
+
+      // 2. Negative Disagreements ("no", "nah", "nope", "not really")
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentPrompt === "echo_check") {
           return `Thought so${nameTag} 😂 So what were you actually trying to say?`;
@@ -358,18 +372,19 @@
         return noReplies[Math.floor(Math.random() * noReplies.length)];
       }
 
-      // 2. Feature Connection (Avoids "the the topic")
+      // 3. Feature Connection (Binds sub-features to parent topic)
       if (currentPrompt === "ask_favorite_feature" || (currentTopic && /^(?:it has|i got|it got|has)\b/i.test(clean))) {
         const feature = extractSubject(normalized) || clean.replace(/^(it has|i got|has)\s+/i, '');
         if (feature) {
           activeFeature = feature;
+          if (!topicHistory.includes(feature)) topicHistory.push(feature);
           const target = currentTopic ? ` on the ${currentTopic}` : "";
           lastBotPrompt = "ask_feature_details";
           return `Nice, having ${feature}${target} sounds solid${nameTag}! What kind of stuff do you do with it?`;
         }
       }
 
-      // 3. Explanations / Reasons referencing the active topic
+      // 4. Explanations / Reasons referencing active topic
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentPrompt === "ask_why_topic" && clean.includes("cool"))) {
         if (currentTopic) {
           lastBotPrompt = "ask_favorite_feature";
@@ -379,12 +394,12 @@
         }
       }
 
-      // 4. Asking about name recall
+      // 5. Asking about name recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName ? `Your name is ${fullName}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 5. Name Extraction / Learning
+      // 6. Name Extraction / Learning
       const nameMatch = rawInput.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)/i);
       if (nameMatch && nameMatch[1]) {
         const parsedName = formatName(nameMatch[1]);
@@ -398,7 +413,7 @@
         return `Nice to meet you, ${parsedName}! I've logged that in my memory.`;
       }
 
-      // 6. Positive Status / Agreements
+      // 7. Positive Status / Agreements
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentPrompt === "general_greeting") {
           return `Awesome! So what are we getting into today${nameTag}?`;
@@ -419,22 +434,22 @@
         }
       }
 
-      // 7. Negative Status
+      // 8. Negative Status
       if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean)) {
         return `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`;
       }
 
-      // 8. Capabilities / Help
+      // 9. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: remember facts ('remember that...'), extract topics cleanly, chain related features, hold conversations, auto-correct typos, and store memory${nameTag}!`;
+        return `Here's what I can do: remember facts ('remember that...'), track full chat history ('what was I talking about earlier?'), chain features, auto-correct typos, and store memory${nameTag}!`;
       }
 
-      // 9. Identity of SBG
+      // 10. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return `I'm SBG: Simulated But Good! A symbolic AI with persistent memory and deterministic logic${nameTag}.`;
       }
 
-      // 10. Short acknowledgements
+      // 11. Short acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|lol|lmao|gotcha)\b/i.test(clean)) {
         const acks = [
           `Yep${nameTag}!`,
@@ -446,7 +461,7 @@
         return acks[Math.floor(Math.random() * acks.length)];
       }
 
-      // 11. Greetings
+      // 12. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         lastBotPrompt = "ask_how_are_you";
         const greetings = [
@@ -457,19 +472,19 @@
         return greetings[Math.floor(Math.random() * greetings.length)];
       }
 
-      // 12. Status question directed to bot
+      // 13. Status question directed to bot
       if (clean.includes("how are you") || clean.includes("how r u")) {
         lastBotPrompt = "ask_how_are_you";
         return `Running smoothly at 60 FPS in your browser cache! How about yourself${nameTag}?`;
       }
 
-      // 13. Feelings
+      // 14. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         return `Why do you feel ${feelMatch[1]}? Does that happen often${nameTag}?`;
       }
 
-      // 14. Memory Factoid System
+      // 15. Memory Factoid System
       const rememberMatch = clean.match(/remember that (.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const facts = memory.get('facts') || [];
@@ -487,10 +502,13 @@
         return info.join(". ") + ".";
       }
 
-      // 15. Intelligent Subject Extraction with Topic Anchoring
+      // 16. Intelligent Subject Extraction with Topic Anchoring & History Logging
       const extractedSubject = extractSubject(normalized);
       if (extractedSubject && extractedSubject.length > 0) {
         currentTopic = extractedSubject;
+        if (!topicHistory.includes(extractedSubject)) {
+          topicHistory.push(extractedSubject);
+        }
         lastBotPrompt = "ask_why_topic";
         
         const subjectQuestions = [
@@ -502,14 +520,14 @@
         return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
       }
 
-      // 16. Context Anchors from Past Memories
+      // 17. Context Anchors from Past Memories
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 17. Non-Repeating Fallbacks
+      // 18. Non-Repeating Fallbacks
       const fallbacks = [
         `Interesting point. Tell me more about that${nameTag}.`,
         `I'm simulated, but that sounds legit${nameTag}.`,
@@ -547,6 +565,7 @@
       lastUserInput = "";
       currentTopic = "";
       activeFeature = "";
+      topicHistory = [];
       repeatCount = 0;
     }
 
