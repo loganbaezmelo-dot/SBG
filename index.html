@@ -365,45 +365,49 @@
       }
     }
 
-    // Filtered Wikipedia Launch Games Extractor
-    async function fetchWikipediaGames(query) {
+    // Accurate Wikipedia Section Search for Launch Titles
+    async function fetchWikipediaLaunchGames(consoleName) {
       try {
-        const consoleName = query
-          .replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '')
-          .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|titles?)$/i, '')
-          .trim();
-
-        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(consoleName + ' launch titles video games')}&srlimit=8&format=json&origin=*`;
-        const res = await fetch(searchUrl);
+        const cleanName = consoleName.replace(/^(?:the\s+)/i, '').trim();
+        
+        // Search Wikipedia's official launch title database page
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=List_of_video_game_console_launch_titles&prop=text&format=json&origin=*`);
         if (!res.ok) return null;
         const data = await res.json();
-        const results = data && data.query && data.query.search;
-        if (!results || results.length === 0) return null;
+        const html = data && data.parse && data.parse.text && data.parse.text["*"];
+        if (!html) return null;
 
-        const blacklist = [
-          'nintendo switch 2', 'nintendo switch', 'wii u', 'wii', 'playstation', 'xbox', 
-          'gamecube', 'video game console', 'game console', 'handheld game console'
-        ];
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
 
-        const games = [];
-        for (let r of results) {
-          let cleanTitle = r.title.replace(/\s*\(video game\)/i, '').replace(/\s*\(.*\)/i, '').trim();
-          let lower = cleanTitle.toLowerCase();
+        // Find the heading corresponding to the console
+        const headings = Array.from(doc.querySelectorAll('h2, h3, h4'));
+        const targetHeading = headings.find(h => h.textContent.toLowerCase().includes(cleanName.toLowerCase()));
 
-          // Reject if it's the console hardware, a list page, or a platform article
-          const isHardware = blacklist.some(b => lower === b || lower === `the ${b}`);
-          const isMetaPage = lower.startsWith('list of') || lower.includes('lineup') || lower.includes('generation');
+        if (targetHeading) {
+          let nextElem = targetHeading.nextElementSibling;
+          while (nextElem && nextElem.tagName !== 'TABLE' && !['H2', 'H3', 'H4'].includes(nextElem.tagName)) {
+            nextElem = nextElem.nextElementSibling;
+          }
 
-          if (!isHardware && !isMetaPage && !games.includes(cleanTitle)) {
-            // Verify snippet actually discusses games or launch
-            if (/\b(?:video game|action-adventure|platformer|rpg|racing game|developed by|published by|launch title)\b/i.test(r.snippet)) {
-              games.push(cleanTitle);
+          if (nextElem && nextElem.tagName === 'TABLE') {
+            const rows = Array.from(nextElem.querySelectorAll('tr'));
+            const gameTitles = [];
+            for (let r of rows) {
+              const firstCell = r.querySelector('td i a, td i, td a, td');
+              if (firstCell) {
+                const title = firstCell.textContent.trim();
+                if (title && title.length > 2 && !gameTitles.includes(title) && !title.toLowerCase().includes('title')) {
+                  gameTitles.push(title);
+                }
+              }
+              if (gameTitles.length >= 4) break;
+            }
+
+            if (gameTitles.length > 0) {
+              return gameTitles.join(', ');
             }
           }
-        }
-
-        if (games.length >= 2) {
-          return games.slice(0, 4).join(', ');
         }
         return null;
       } catch (err) {
@@ -416,9 +420,16 @@
         let cleanQuery = query.trim();
 
         if (mode === "games") {
-          const gameList = await fetchWikipediaGames(cleanQuery);
+          const consoleName = cleanQuery
+            .replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '')
+            .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|titles?)$/i, '')
+            .trim();
+
+          const gameList = await fetchWikipediaLaunchGames(consoleName);
           if (gameList) {
             return `Key launch titles recorded on Wikipedia include: ${gameList}.`;
+          } else {
+            return null;
           }
         }
         
