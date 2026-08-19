@@ -365,9 +365,38 @@
       }
     }
 
+    // Search Wikipedia snippets for specific game lineup keywords
+    async function searchWikipediaGamesSnippet(query) {
+      try {
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=3&format=json&origin=*`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const results = data && data.query && data.query.search;
+        if (!results || results.length === 0) return null;
+
+        for (let r of results) {
+          let cleanSnippet = r.snippet.replace(/<span class="searchmatch">/g, '').replace(/<\/span>/g, '').replace(/\[\d+\]/g, '').trim();
+          if (/\b(?:launch title|launch titles|launch games|lineup|bundled with|alongside|release games)\b/i.test(cleanSnippet)) {
+            return cleanSnippet;
+          }
+        }
+        return null;
+      } catch (err) {
+        return null;
+      }
+    }
+
     async function fetchWikipediaSummary(query, mode = "general") {
       try {
         let cleanQuery = query.trim();
+
+        // If asking for games, try snippet search first
+        if (mode === "games") {
+          const snippetMatch = await searchWikipediaGamesSnippet(`${cleanQuery} launch titles games`);
+          if (snippetMatch && snippetMatch.length > 20) {
+            return snippetMatch;
+          }
+        }
         
         let resolvedTitle = await searchWikipediaTitle(cleanQuery);
         if (!resolvedTitle) {
@@ -399,14 +428,6 @@
         if (mode === "date") {
           for (let s of rawSentences) {
             if (/\b(?:released in|released on|launched in|launched on|first released)\b/i.test(s)) {
-              return s.trim();
-            }
-          }
-        }
-
-        if (mode === "games") {
-          for (let s of rawSentences) {
-            if (/\b(?:launch title|launch titles|launch games|lineup|bundled with|alongside)\b/i.test(s)) {
               return s.trim();
             }
           }
@@ -522,7 +543,7 @@
       const isGamesQuery = /(?:launch games?|launch titles?|launch lineup|what games did it launch with)\b/i.test(clean);
       if (isGamesQuery) {
         const queryTerm = clean.replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '').trim();
-        const gamesSummary = await fetchWikipediaSummary(queryTerm, "games") || await fetchWikipediaSummary(queryTerm, "general");
+        const gamesSummary = await fetchWikipediaSummary(queryTerm, "games");
         if (gamesSummary) {
           return pickRandom([
             `Here's what Wikipedia has on the lineup${nameTag}: ${gamesSummary}`,
@@ -912,7 +933,7 @@
 
       // 24. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: dynamically lookup console info and games on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
+        return `Here's what I can do: dynamically lookup console info and launch game lineups on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
       }
 
       // 25. Identity
