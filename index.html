@@ -368,9 +368,11 @@
     // Accurate Wikipedia Section Search for Launch Titles
     async function fetchWikipediaLaunchGames(consoleName) {
       try {
-        const cleanName = consoleName.replace(/^(?:the\s+)/i, '').trim();
-        
-        // Search Wikipedia's official launch title database page
+        let cleanName = consoleName.replace(/^(?:the\s+)/i, '').trim();
+        if (/^switch$/i.test(cleanName)) cleanName = "Nintendo Switch";
+        if (/^switch\s*2$/i.test(cleanName)) cleanName = "Nintendo Switch 2";
+        if (/^wii\s*u$/i.test(cleanName)) cleanName = "Wii U";
+
         const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=List_of_video_game_console_launch_titles&prop=text&format=json&origin=*`);
         if (!res.ok) return null;
         const data = await res.json();
@@ -380,12 +382,11 @@
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
 
-        // Find the heading corresponding to the console
-        const headings = Array.from(doc.querySelectorAll('h2, h3, h4'));
+        const headings = Array.from(doc.querySelectorAll('h2, h3, h4, .mw-headline'));
         const targetHeading = headings.find(h => h.textContent.toLowerCase().includes(cleanName.toLowerCase()));
 
         if (targetHeading) {
-          let nextElem = targetHeading.nextElementSibling;
+          let nextElem = targetHeading.parentElement ? targetHeading.parentElement.nextElementSibling : targetHeading.nextElementSibling;
           while (nextElem && nextElem.tagName !== 'TABLE' && !['H2', 'H3', 'H4'].includes(nextElem.tagName)) {
             nextElem = nextElem.nextElementSibling;
           }
@@ -394,9 +395,9 @@
             const rows = Array.from(nextElem.querySelectorAll('tr'));
             const gameTitles = [];
             for (let r of rows) {
-              const firstCell = r.querySelector('td i a, td i, td a, td');
-              if (firstCell) {
-                const title = firstCell.textContent.trim();
+              const cell = r.querySelector('td i a, td i, td a, td');
+              if (cell) {
+                const title = cell.textContent.trim();
                 if (title && title.length > 2 && !gameTitles.includes(title) && !title.toLowerCase().includes('title')) {
                   gameTitles.push(title);
                 }
@@ -420,7 +421,7 @@
         let cleanQuery = query.trim();
 
         if (mode === "games") {
-          const consoleName = cleanQuery
+          const consoleName = extractConsole(cleanQuery) || cleanQuery
             .replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '')
             .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|titles?)$/i, '')
             .trim();
@@ -577,8 +578,13 @@
       // 2. Launch Games / Games List Specific Query
       const isGamesQuery = /(?:launch games?|launch titles?|launch lineup|what games did it launch with|games for)\b/i.test(clean);
       if (isGamesQuery) {
-        const queryTerm = clean.replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '').trim();
-        const gamesSummary = await fetchWikipediaSummary(queryTerm, "games");
+        const detectedConsole = extractConsole(clean);
+        const targetConsole = detectedConsole || clean
+          .replace(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the)?)\s+/i, '')
+          .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|titles?)$/i, '')
+          .trim();
+
+        const gamesSummary = await fetchWikipediaSummary(targetConsole, "games");
         if (gamesSummary) {
           return pickRandom([
             `Here's what Wikipedia has on the lineup${nameTag}: ${gamesSummary}`,
@@ -586,7 +592,7 @@
             `Looked that up! Basically, ${gamesSummary}`
           ]);
         } else {
-          return `I checked Wikipedia, but there isn't a confirmed launch game lineup listed for "${queryTerm}" yet${nameTag}!`;
+          return `I checked Wikipedia, but there isn't an official launch lineup confirmed for the ${targetConsole} yet${nameTag}!`;
         }
       }
 
