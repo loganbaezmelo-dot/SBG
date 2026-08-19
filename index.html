@@ -155,7 +155,6 @@
   </div>
 
   <script>
-    // Memory Manager
     const memory = {
       get: (key) => JSON.parse(localStorage.getItem(`sbg_${key}`)),
       set: (key, val) => localStorage.setItem(`sbg_${key}`, JSON.stringify(val)),
@@ -169,9 +168,11 @@
     const messagesContainer = document.getElementById('messages');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
+    
+    // Conversation State Context
     let lastFallback = "";
+    let lastBotPrompt = ""; // Tracks what SBG just asked the user
 
-    // Stop words (filler, verbs, prepositions, articles) to isolate key nouns/subjects
     const stopWords = new Set([
       "i", "me", "my", "myself", "we", "our", "you", "your", "he", "she", "it", "they",
       "wanna", "want", "do", "some", "like", "love", "hate", "play", "make", "get", "go",
@@ -180,11 +181,11 @@
       "of", "at", "in", "on", "by", "from", "up", "down", "out", "over", "under", "again",
       "then", "once", "here", "there", "when", "where", "why", "how", "all", "any",
       "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor",
-      "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna"
+      "not", "only", "own", "same", "so", "than", "too", "very", "just", "really", "gonna",
+      "good", "bad", "fine", "great", "well", "okay", "ok", "alright", "chill", "nothing", "idk"
     ]);
 
     function extractSubject(sentence) {
-      // 1. Check common phrase prefixes first
       const phrasePatterns = [
         /(?:i wanna do some|i want to play|i wanna play|i like|i love|tell me about|thinking about|what about)\s+(.+)/i,
         /(?:how about|lets talk about|let's talk about|can we do)\s+(.+)/i
@@ -197,14 +198,12 @@
         }
       }
 
-      // 2. Token filter logic: filter out stop-words to isolate the subject
       const cleanTokens = sentence
         .replace(/[^\w\s]/gi, '')
         .split(/\s+/)
         .filter(w => w.length > 1 && !stopWords.has(w.toLowerCase()));
 
       if (cleanTokens.length > 0) {
-        // Return remaining subject terms (e.g. "nintendo")
         return cleanTokens.join(" ");
       }
 
@@ -225,9 +224,11 @@
       memory.set('visitCount', visits);
 
       if (name) {
-        appendMessage(`Welcome back! Good to see you again. What's on your mind?`, 'bot');
+        appendMessage("Welcome back! Good to see you again. What's on your mind?", 'bot');
+        lastBotPrompt = "general_greeting";
       } else {
         appendMessage("Hey! I'm SBG (Simulated But Good). What's your name?", 'bot');
+        lastBotPrompt = "ask_name";
       }
     }
 
@@ -235,6 +236,8 @@
       const clean = input.toLowerCase().trim();
       let name = memory.get('userName');
       const nameTag = name ? `, ${name}` : "";
+      const currentPrompt = lastBotPrompt;
+      lastBotPrompt = ""; // Reset prompt state for next turn
 
       // 1. Name Extraction / Learning
       const nameMatch = clean.match(/(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z]+)/i);
@@ -244,28 +247,54 @@
         return `Got it! I'll remember that your name is ${detectedName}.`;
       }
 
-      if (!name && clean.split(" ").length === 1 && clean.length > 1) {
+      if ((!name || currentPrompt === "ask_name") && clean.split(" ").length === 1 && clean.length > 1 && !stopWords.has(clean)) {
         const singleName = clean.charAt(0).toUpperCase() + clean.slice(1);
         memory.set('userName', singleName);
         return `Nice to meet you, ${singleName}! I've logged that in my memory.`;
       }
 
-      // 2. Asking about identity / name recall
+      // 2. Positive Status ("good", "great", "fine", etc.)
+      if (/^(good|great|fine|doing good|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
+        // If bot previously asked how you are doing
+        if (currentPrompt === "ask_how_are_you") {
+          const replies = [
+            `Glad to hear that${nameTag}! What are you working on today?`,
+            `Awesome${nameTag}. What's next on the agenda?`,
+            `Nice! What are we getting into today${nameTag}?`
+          ];
+          return replies[Math.floor(Math.random() * replies.length)];
+        } else {
+          // If user randomly says "good" without being asked
+          const randomGoodReplies = [
+            `Nice! What's happening that's so good${nameTag}?`,
+            `Love that energy${nameTag}. What made your day good?`,
+            `Good vibes only. What are you up to right now${nameTag}?`
+          ];
+          return randomGoodReplies[Math.floor(Math.random() * randomGoodReplies.length)];
+        }
+      }
+
+      // 3. Negative Status
+      if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean)) {
+        return `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`;
+      }
+
+      // 4. Name recall
       if (clean.includes("what is my name") || clean.includes("who am i") || clean.includes("do you know me")) {
         return name ? `Your name is ${name}! See? Memory is working.` : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 3. Capabilities / Help
+      // 5. Capabilities / Help
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: remember facts ('remember that...'), extract topics, hold conversations, recall info, and store memory${nameTag}!`;
       }
 
-      // 4. Identity of SBG
+      // 6. Identity of SBG
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return `I'm SBG: Simulated But Good! A symbolic AI with persistent memory and deterministic logic${nameTag}.`;
       }
 
-      // 5. Short acknowledgements
+      // 7. Short acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|fs|facts|word|lol|lmao|gotcha)\b/i.test(clean)) {
         const acks = [
           `Yep${nameTag}!`,
@@ -277,28 +306,30 @@
         return acks[Math.floor(Math.random() * acks.length)];
       }
 
-      // 6. Greetings
+      // 8. Greetings (Sets the state so SBG knows it asked how you are)
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
+        lastBotPrompt = "ask_how_are_you";
         const greetings = [
           `Hello there! How's your day going${nameTag}?`,
-          `Yo! What are we working on today${nameTag}?`,
-          `Hey! What's new${nameTag}?`
+          `Yo! How are you doing today${nameTag}?`,
+          `Hey! How's everything going${nameTag}?`
         ];
         return greetings[Math.floor(Math.random() * greetings.length)];
       }
 
-      // 7. Status / How are you
+      // 9. Status question directed to bot
       if (clean.includes("how are you") || clean.includes("how r u")) {
+        lastBotPrompt = "ask_how_are_you";
         return `Running smoothly at 60 FPS in your browser cache! How about yourself${nameTag}?`;
       }
 
-      // 8. Feelings
+      // 10. Feelings
       const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         return `Why do you feel ${feelMatch[1]}? Does that happen often${nameTag}?`;
       }
 
-      // 9. Memory Factoid System
+      // 11. Memory Factoid System
       const rememberMatch = clean.match(/remember that (.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const facts = memory.get('facts') || [];
@@ -316,7 +347,7 @@
         return info.join(". ") + ".";
       }
 
-      // 10. Intelligent Subject Extraction & Inquisitive Responses
+      // 12. Intelligent Subject Extraction
       const extractedSubject = extractSubject(input);
       if (extractedSubject && extractedSubject.length > 1) {
         const subjectQuestions = [
@@ -328,14 +359,14 @@
         return subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
       }
 
-      // 11. Context Anchors from Past Memories
+      // 13. Context Anchors from Past Memories
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 12. Non-Repeating Fallbacks
+      // 14. Non-Repeating Fallbacks
       const fallbacks = [
         `Interesting point. Tell me more about that${nameTag}.`,
         `I'm simulated, but that sounds legit${nameTag}.`,
@@ -369,6 +400,7 @@
       memory.clear();
       messagesContainer.innerHTML = '';
       appendMessage("Memory wiped clean. Who are you again?", 'bot');
+      lastBotPrompt = "ask_name";
     }
 
     initBot();
