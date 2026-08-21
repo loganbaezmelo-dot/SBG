@@ -351,7 +351,7 @@
     function detectSentiment(text) {
       if (/\b(fuck|shit|damn|crap|hell|wtf|hate|annoyed|broken|trash|pissed)\b/i.test(text)) return "frustrated";
       if (/\b(great|awesome|love|cool|fire|nice|hyped|smooth|good|best)\b/i.test(text)) return "positive";
-      if (/\b(bad|awful|sad|unhappy|tired|bored|sucks)\b/i.test(text)) return "negative";
+      if (/\b(bad|awful|sad|unhappy|tired|bored|sucks|terrible|horrible|depressed)\b/i.test(text)) return "negative";
       return "neutral";
     }
 
@@ -626,7 +626,35 @@
         lastUserInput = clean;
       }
 
-      // 1. Release Date Query Intent
+      // 1. Feelings & Sentiment Expressions (Checked before Name Extraction)
+      const feelMatch = clean.match(/(?:i feel|i am feeling|im feeling|i'm feeling)\s+(.*)/i);
+      if (feelMatch && feelMatch[1]) {
+        const feeling = feelMatch[1].trim();
+        contextStack.sentiment = detectSentiment(feeling);
+        if (contextStack.sentiment === "negative") {
+          return pickRandom([
+            `Sorry to hear you're feeling ${feeling}${nameTag}. Anything specific happen?`,
+            `Ah, that's rough${nameTag}. What's making you feel ${feeling}?`,
+            `Hate that you're feeling ${feeling}. What's going on today?`
+          ]);
+        }
+        return pickRandom([
+          `Why are you feeling ${feeling}? Did something cool happen${nameTag}?`,
+          `What's making you feel ${feeling} today${nameTag}?`,
+          `Feeling ${feeling} is valid. Tell me more!`
+        ]);
+      }
+
+      // 2. Negative Status Only
+      if (/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:feeling\s+)?(bad|not good|terrible|awful|tired|bored|sad|down|unhappy|horrible|depressed)\b/i.test(clean) || (contextStack.sentiment === "negative" && !clean.includes("name"))) {
+        return pickRandom([
+          `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
+          `Ah that's rough${nameTag}. Anything specific causing the headache?`,
+          `Hate to hear that! What's been getting in the way today${nameTag}?`
+        ]);
+      }
+
+      // 3. Release Date Query Intent
       const dateQueryMatch = clean.match(/^(?:when was|when did)\s+(?:the\s+)?([^,?!.]+?)\s+(?:released|come out|launch|launched)/i);
       if (dateQueryMatch && dateQueryMatch[1]) {
         const queryTerm = dateQueryMatch[1].trim();
@@ -642,7 +670,7 @@
         }
       }
 
-      // 2. Launch Games / Games List Specific Query
+      // 4. Launch Games / Games List Specific Query
       const isGamesQuery = /(?:launch games?|launch titles?|launch lineup|what games did it launch with|games for)\b/i.test(clean);
       if (isGamesQuery) {
         const detectedConsole = extractConsole(clean);
@@ -664,7 +692,7 @@
         }
       }
 
-      // 3. General Information Query Intent
+      // 5. General Information Query Intent
       const isInformationalQuery = /^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i.test(clean);
 
       if (isInformationalQuery) {
@@ -688,7 +716,7 @@
         }
       }
 
-      // 4. Compound Sentence & Multi-Clause Intent Engine
+      // 6. Compound Sentence & Multi-Clause Intent Engine
       const compoundSplit = rawInput.split(/\s+(?:and(?:\s+i)?|also(?:\s+i)?|plus(?:\s+i)?|then(?:\s+i)?|but(?:\s+i)?)\s+/i);
       if (compoundSplit.length >= 2) {
         const clause1 = compoundSplit[0].trim();
@@ -716,7 +744,7 @@
         }
       }
 
-      // 5. History & Conversation Recall
+      // 7. History & Conversation Recall
       const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|done|talking about|talked about|talk about|saying|said|discussed|covered)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
@@ -730,7 +758,7 @@
         }
       }
 
-      // 6. Single-letter Ignore
+      // 8. Single-letter Ignore
       if (clean.length <= 1) {
         return pickRandom([
           `Just one letter? Type out a word${nameTag}!`,
@@ -739,7 +767,7 @@
         ]);
       }
 
-      // 7. Frustration / Outbursts
+      // 9. Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -750,7 +778,7 @@
         ]);
       }
 
-      // 8. Memory Factoid Storage
+      // 10. Memory Factoid Storage
       const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const factText = rememberMatch[1].trim();
@@ -783,7 +811,7 @@
         return info.join(". ") + ".";
       }
 
-      // 9. Directional Echos
+      // 11. Directional Echos
       if (/^(?:your|my)\s+(?:end|side)\b/i.test(clean)) {
         return pickRandom([
           `Just everything on my side! Code, memory, and logic are running smooth${nameTag}.`,
@@ -792,7 +820,7 @@
         ]);
       }
 
-      // 10. Status Return
+      // 12. Status Return
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
         contextStack.questionState = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
@@ -809,7 +837,7 @@
         ]);
       }
 
-      // 11. Positive Acknowledgements
+      // 13. Positive Acknowledgements
       if (/^(?:that(?:'s|s)?|it(?:'s|s)?|sounds?)\s+(?:good|great|cool|awesome|dope|nice|solid|valid|fair)\b/i.test(clean)) {
         return pickRandom([
           `Glad to hear it${nameTag}! What's next on your mind?`,
@@ -820,7 +848,7 @@
         ]);
       }
 
-      // 12. Inquiries & Deflections
+      // 14. Inquiries & Deflections
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return pickRandom([
           `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`,
@@ -861,7 +889,7 @@
         ]);
       }
 
-      // 13. Detected Feature / Sub-Topic on Active Context
+      // 15. Detected Feature / Sub-Topic on Active Context
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         contextStack.subTopic = detectedFeature;
@@ -892,7 +920,7 @@
         ]);
       }
 
-      // 14. Activity Updates
+      // 16. Activity Updates
       const isStatusOnly = /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:doing\s+)?(?:great|good|fine|well|alright|ok|okay)$/i.test(clean);
       if (!isStatusOnly && /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i.test(clean)) {
         const activityMatch = clean.match(/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i);
@@ -906,7 +934,7 @@
         }
       }
 
-      // 15. Feature Details
+      // 17. Feature Details
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         contextStack.questionState = "ask_homebrew_apps";
         return pickRandom([
@@ -916,7 +944,7 @@
         ]);
       }
 
-      // 16. Vague Quantity Answers
+      // 18. Vague Quantity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentQuestionState === "ask_feature_details") {
           contextStack.questionState = "ask_specific_app";
@@ -935,7 +963,7 @@
         }
       }
 
-      // 17. Disagreements
+      // 19. Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentQuestionState === "echo_check") {
           return pickRandom([
@@ -951,7 +979,7 @@
         ]);
       }
 
-      // 18. Positive Status
+      // 20. Positive Status
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentQuestionState === "general_greeting" || currentQuestionState === "ask_how_are_you") {
           return pickRandom([
@@ -971,7 +999,7 @@
         }
       }
 
-      // 19. Topic Reasons
+      // 21. Topic Reasons
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
         if (contextStack.topic) {
           const topicWithArt = formatTopicWithArticle(contextStack.topic);
@@ -989,7 +1017,7 @@
         }
       }
 
-      // 20. Name Recall
+      // 22. Name Recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName 
           ? pickRandom([
@@ -1000,11 +1028,11 @@
           : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 21. Name Extraction
-      const isActivityPhrase = /^(?:up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
+      // 23. Name Extraction (Explicitly excludes feelings/states/moods)
+      const isInvalidNamePhrase = /^(?:feeling|sad|bad|good|great|fine|happy|up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
-      if (nameMatch && nameMatch[1] && !isActivityPhrase) {
+      if (nameMatch && nameMatch[1] && !isInvalidNamePhrase) {
         const words = nameMatch[1].trim().split(/\s+/);
         if (words.length <= 3 && !stopWords.has(words[0].toLowerCase())) {
           const parsedName = formatName(nameMatch[1]);
@@ -1017,7 +1045,7 @@
         }
       }
 
-      if ((!fullName || currentQuestionState === "ask_name") && rawInput.split(" ").length <= 3 && rawInput.length > 1 && !stopWords.has(clean) && !isActivityPhrase) {
+      if ((!fullName || currentQuestionState === "ask_name") && rawInput.split(" ").length <= 3 && rawInput.length > 1 && !stopWords.has(clean) && !isInvalidNamePhrase) {
         const parsedName = formatName(rawInput);
         memory.set('userName', parsedName);
         return pickRandom([
@@ -1027,16 +1055,7 @@
         ]);
       }
 
-      // 22. Negative Status
-      if (/^(bad|not good|terrible|awful|tired|bored)\b/i.test(clean) || contextStack.sentiment === "negative") {
-        return pickRandom([
-          `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
-          `Ah that's rough${nameTag}. Anything specific causing the headache?`,
-          `Hate to hear that! What's been getting in the way today${nameTag}?`
-        ]);
-      }
-
-      // 23. Natural Short Acknowledgements
+      // 24. Natural Short Acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
           `Gotcha! What's next on your mind${nameTag}?`,
@@ -1047,12 +1066,12 @@
         ]);
       }
 
-      // 24. Help & Commands
+      // 25. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
         return `Here's what I can do: dynamically lookup console info and launch game lineups on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
       }
 
-      // 25. Identity
+      // 26. Identity
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
@@ -1060,7 +1079,7 @@
         ]);
       }
 
-      // 26. Greetings
+      // 27. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -1068,16 +1087,6 @@
           `Yo! How are you doing today${nameTag}?`,
           `Hey! How's everything going${nameTag}?`,
           `Sup! What are you working on today${nameTag}?`
-        ]);
-      }
-
-      // 27. Feelings
-      const feelMatch = clean.match(/(?:i feel|i am feeling)\s+(.*)/i);
-      if (feelMatch && feelMatch[1]) {
-        return pickRandom([
-          `Why do you feel ${feelMatch[1]}? Does that happen often${nameTag}?`,
-          `What's making you feel ${feelMatch[1]} today${nameTag}?`,
-          `Feeling ${feelMatch[1]} is definitely valid. What led up to that?`
         ]);
       }
 
