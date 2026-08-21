@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SBG - Simulated But Good</title>
+  <title>SBG - Simulated But Good (Maximum Complexity)</title>
   <style>
     :root {
-      --bg: #0b1120;
-      --card: #1e293b;
-      --text: #f8fafc;
-      --user-msg: #3b82f6;
-      --bot-msg: #334155;
+      --bg: #070d1b;
+      --card: #131c31;
+      --text: #f1f5f9;
+      --user-msg: #2563eb;
+      --bot-msg: #1e293b;
       --accent: #10b981;
       --border: #334155;
     }
@@ -37,34 +37,34 @@
     .chat-container {
       background: var(--card);
       width: 100%;
-      max-width: 650px;
+      max-width: 680px;
       height: 100%;
       max-height: 100dvh;
-      border-radius: 14px;
+      border-radius: 16px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
       border: 1px solid var(--border);
     }
 
     header {
-      padding: 12px 16px;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #0f172a;
+      background: #0b1326;
       flex-shrink: 0;
     }
 
     .header-title {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       font-weight: 700;
-      font-size: 1rem;
-      letter-spacing: 0.3px;
+      font-size: 1.05rem;
+      letter-spacing: 0.4px;
     }
 
     .status-dot {
@@ -72,7 +72,7 @@
       height: 10px;
       border-radius: 50%;
       background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
+      box-shadow: 0 0 10px var(--accent);
     }
 
     .messages {
@@ -86,38 +86,39 @@
 
     .message {
       max-width: 82%;
-      padding: 10px 14px;
-      border-radius: 12px;
+      padding: 12px 16px;
+      border-radius: 14px;
       font-size: 0.95rem;
-      line-height: 1.45;
+      line-height: 1.5;
       word-break: break-word;
     }
 
     .message.user {
       align-self: flex-end;
       background-color: var(--user-msg);
-      border-bottom-right-radius: 2px;
+      border-bottom-right-radius: 3px;
     }
 
     .message.bot {
       align-self: flex-start;
       background-color: var(--bot-msg);
-      border-bottom-left-radius: 2px;
+      border-bottom-left-radius: 3px;
+      border: 1px solid var(--border);
     }
 
     form {
       display: flex;
-      padding: 12px;
-      gap: 8px;
-      background: #0f172a;
+      padding: 12px 16px;
+      gap: 10px;
+      background: #0b1326;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
 
     input {
       flex: 1;
-      padding: 12px 14px;
-      border-radius: 8px;
+      padding: 12px 16px;
+      border-radius: 10px;
       border: 1px solid var(--border);
       background: var(--card);
       color: var(--text);
@@ -130,8 +131,8 @@
     }
 
     button {
-      padding: 12px 18px;
-      border-radius: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
       border: none;
       background: var(--user-msg);
       color: white;
@@ -141,7 +142,7 @@
     }
 
     button:hover {
-      background: #2563eb;
+      background: #1d4ed8;
     }
   </style>
 </head>
@@ -151,15 +152,15 @@
     <header>
       <div class="header-title">
         <span class="status-dot"></span>
-        <span>SBG (Simulated But Good)</span>
+        <span>SBG (Simulated But Good - Ultra Complex)</span>
       </div>
-      <button onclick="clearMemory()" style="padding: 6px 10px; font-size: 0.75rem; background: #ef4444; border-radius: 6px;">Reset Memory</button>
+      <button onclick="clearMemory()" style="padding: 6px 12px; font-size: 0.75rem; background: #ef4444; border-radius: 8px;">Reset Memory</button>
     </header>
 
     <div class="messages" id="messages"></div>
 
     <form id="chat-form">
-      <input type="text" id="user-input" placeholder="Type a message..." autocomplete="off" />
+      <input type="text" id="user-input" placeholder="Type a message or name a console..." autocomplete="off" />
       <button type="submit">Send</button>
     </form>
   </div>
@@ -625,8 +626,9 @@
         lastUserInput = clean;
       }
 
-      // 1. TOP PRIORITY: Memory, Fact & Preference Checks
-      const isMemoryRecallQuery = /^(?:what do you know|what do you remember|what have you learned|what am i into|what do i like|what are my favorites|remind me what i like|show me what you know)$/i.test(clean);
+      // 1. HARD GUARDRAIL: Memory, Facts & Preference Checks (Zero Wikipedia)
+      const isMemoryRecallQuery = /^(?:what do you know|what do u know|what do you remember|what do u remember|what have you learned|what am i into|what do i like|what are my favorites|remind me what i like|show me what you know)$/i.test(clean) || /^(?:what do you know about me|what do you know|what do u know)\b/i.test(clean);
+
       if (isMemoryRecallQuery) {
         const facts = memory.get('facts') || [];
         const details = [];
@@ -739,10 +741,10 @@
         }
       }
 
-      // 7. General Information Query Intent (Strictly excludes memory phrases)
+      // 7. General Information Query Intent (Strictly excludes self/memory checks)
       const isInformationalQuery = /^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i.test(clean);
 
-      if (isInformationalQuery && !clean.includes("what am i") && !clean.includes("who am i") && !clean.includes("what do you know") && !clean.includes("what do i like")) {
+      if (isInformationalQuery && !clean.includes("what am i") && !clean.includes("who am i") && !clean.includes("what do you know") && !clean.includes("what do i like") && !clean.includes("what do u know")) {
         const match = clean.match(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i);
         const rawTerm = match ? match[1] : clean;
         const queryTerm = rawTerm
