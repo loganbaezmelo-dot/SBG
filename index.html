@@ -111,7 +111,7 @@
       padding: 12px;
       gap: 8px;
       background: #0f172a;
-      border-top: 1px solid var(--border);
+      border-top: 1px solid #border;
       flex-shrink: 0;
     }
 
@@ -626,7 +626,31 @@
         lastUserInput = clean;
       }
 
-      // 1. Explicit Memory & Preference Recall Query ("What am I into?", "What do I like?")
+      // 1. Memory, Fact, & Self-Knowledge Queries (What do you know / What am I into)
+      const isKnowledgeQuery = /^(?:what do you know(?: about me)?|what do you remember|what have you learned|what am i into|what do i like|what are my favorites|remind me what i like|show me what you know)$/i.test(clean);
+      if (isKnowledgeQuery) {
+        const facts = memory.get('facts') || [];
+        const details = [];
+
+        if (fullName) details.push(`your name is ${fullName}`);
+        if (facts.length > 0) details.push(...facts);
+        if (topicHistory.length > 0) {
+          const uniqueTopics = [...new Set(topicHistory)].map(t => formatTopicWithArticle(t)).join(", ");
+          details.push(`we've covered topics like ${uniqueTopics}`);
+        }
+
+        if (details.length > 0) {
+          return pickRandom([
+            `Here's what I've got logged: ${details.join("; ")}${nameTag}!`,
+            `From our chats, I remember: ${details.join(", ")}${nameTag}.`,
+            `Stored in memory: ${details.join(", ")}!`
+          ]);
+        } else {
+          return `My memory banks are currently empty${nameTag}! Tell me some things you're into.`;
+        }
+      }
+
+      // 2. Explicit Preference Recall Query
       const isPreferenceRecall = /^(?:what (?:am i|do i|are my|is my)\s+(?:into|like|love|favorite|fav|preferred|enjoy|play|running)|remind me what i like)/i.test(rawLower);
       if (isPreferenceRecall) {
         const facts = memory.get('facts') || [];
@@ -647,7 +671,7 @@
         }
       }
 
-      // 2. Feelings & Sentiment Expressions
+      // 3. Feelings & Sentiment Expressions
       const feelMatch = clean.match(/(?:i feel|i am feeling|im feeling|i'm feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         const feeling = feelMatch[1].trim();
@@ -672,7 +696,7 @@
         ]);
       }
 
-      // 3. Negative Status Only
+      // 4. Negative Status Only
       if (/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:feeling\s+)?(bad|not good|terrible|awful|tired|bored|sad|down|unhappy|horrible|depressed)\b/i.test(clean) || (contextStack.sentiment === "negative" && !clean.includes("name"))) {
         return pickRandom([
           `Sorry to hear that${nameTag}. Hopefully things turn around soon! What's going on?`,
@@ -681,7 +705,7 @@
         ]);
       }
 
-      // 4. User Preference Fact Storage ("I like...", "My favorite...")
+      // 5. User Preference Fact Storage ("I like...", "My favorite...")
       const favMatch = clean.match(/^(?:i (?:really )?(?:like|love|enjoy|prefer)|my fav(?:orite)? (?:game|console|thing)? is)\s+(.+)/i);
       if (favMatch && favMatch[1]) {
         const item = favMatch[1].trim();
@@ -699,7 +723,7 @@
         }
       }
 
-      // 5. Release Date Query Intent
+      // 6. Release Date Query Intent
       const dateQueryMatch = clean.match(/^(?:when was|when did)\s+(?:the\s+)?([^,?!.]+?)\s+(?:released|come out|launch|launched)/i);
       if (dateQueryMatch && dateQueryMatch[1]) {
         const queryTerm = dateQueryMatch[1].trim();
@@ -715,7 +739,7 @@
         }
       }
 
-      // 6. Launch Games / Games List Specific Query
+      // 7. Launch Games / Games List Specific Query
       const isGamesQuery = /(?:launch games?|launch titles?|launch lineup|what games did it launch with|games for)\b/i.test(clean);
       if (isGamesQuery) {
         const detectedConsole = extractConsole(clean);
@@ -737,10 +761,10 @@
         }
       }
 
-      // 7. General Information Query Intent (Excludes "what am I into" or user memory)
+      // 8. General Information Query Intent (Excludes user memory phrases)
       const isInformationalQuery = /^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i.test(clean);
 
-      if (isInformationalQuery && !clean.includes("what am i") && !clean.includes("who am i")) {
+      if (isInformationalQuery && !clean.includes("what am i") && !clean.includes("who am i") && !clean.includes("what do you know")) {
         const match = clean.match(/^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i);
         const rawTerm = match ? match[1] : clean;
         const queryTerm = rawTerm
@@ -761,7 +785,7 @@
         }
       }
 
-      // 8. Compound Sentence & Multi-Clause Intent Engine
+      // 9. Compound Sentence & Multi-Clause Intent Engine
       const compoundSplit = rawInput.split(/\s+(?:and(?:\s+i)?|also(?:\s+i)?|plus(?:\s+i)?|then(?:\s+i)?|but(?:\s+i)?)\s+/i);
       if (compoundSplit.length >= 2) {
         const clause1 = compoundSplit[0].trim();
@@ -789,7 +813,7 @@
         }
       }
 
-      // 9. History & Conversation Recall
+      // 10. History & Conversation Recall
       const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|done|talking about|talked about|talk about|saying|said|discussed|covered)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
@@ -803,7 +827,7 @@
         }
       }
 
-      // 10. Single-letter Ignore
+      // 11. Single-letter Ignore
       if (clean.length <= 1) {
         return pickRandom([
           `Just one letter? Type out a word${nameTag}!`,
@@ -812,7 +836,7 @@
         ]);
       }
 
-      // 11. Frustration / Outbursts
+      // 12. Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -821,39 +845,6 @@
           `No need for hostility 😭 What's up?`,
           `Deep breaths! What broke${nameTag}?`
         ]);
-      }
-
-      // 12. Memory Factoid Storage
-      const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
-      if (rememberMatch && rememberMatch[1]) {
-        const factText = rememberMatch[1].trim();
-        const facts = memory.get('facts') || [];
-        
-        let storedFact = factText;
-        if (contextStack.topic && (factText === contextStack.topic.toLowerCase() || factText === "it")) {
-          const targetWithArt = formatTopicWithArticle(contextStack.topic);
-          storedFact = contextStack.subTopic 
-            ? `you have ${contextStack.subTopic} on your ${contextStack.topic}`
-            : `you have ${targetWithArt}`;
-        }
-        
-        facts.push(storedFact);
-        memory.set('facts', facts);
-        
-        return pickRandom([
-          `Stored in memory: "${storedFact}"${nameTag}!`,
-          `Got it locked in my storage: "${storedFact}"${nameTag}.`,
-          `Noted! I'll remember that "${storedFact}".`
-        ]);
-      }
-
-      if (clean.includes("what do you remember") || clean.includes("what do you know about me")) {
-        const facts = memory.get('facts') || [];
-        if (!fullName && facts.length === 0) return "My memory banks are currently empty!";
-        let info = [];
-        if (fullName) info.push(`Your full name is ${fullName}`);
-        if (facts.length > 0) info.push(`Things you told me: ${facts.join(", ")}`);
-        return info.join(". ") + ".";
       }
 
       // 13. Directional Echos
