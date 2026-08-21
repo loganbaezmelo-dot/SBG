@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SBG - Simulated But Good</title>
+  <title>SBG - Simulated But Good (Ultra Complex)</title>
   <style>
     :root {
-      --bg: #0f172a;
+      --bg: #0b1120;
       --card: #1e293b;
       --text: #f8fafc;
       --user-msg: #3b82f6;
       --bot-msg: #334155;
       --accent: #10b981;
+      --accent-hover: #059669;
+      --border: #334155;
     }
 
     * {
@@ -36,38 +38,42 @@
     .chat-container {
       background: var(--card);
       width: 100%;
-      max-width: 600px;
+      max-width: 650px;
       height: 100%;
       max-height: 100dvh;
-      border-radius: 12px;
+      border-radius: 14px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
     }
 
     header {
-      padding: 14px 16px;
-      border-bottom: 1px solid #334155;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      background: #0f172a;
       flex-shrink: 0;
     }
 
-    header h1 {
-      font-size: 1.05rem;
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      font-size: 1rem;
+      letter-spacing: 0.3px;
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--accent);
-      display: inline-block;
-      margin-right: 6px;
+      box-shadow: 0 0 8px var(--accent);
     }
 
     .messages {
@@ -80,11 +86,11 @@
     }
 
     .message {
-      max-width: 80%;
+      max-width: 82%;
       padding: 10px 14px;
       border-radius: 12px;
       font-size: 0.95rem;
-      line-height: 1.4;
+      line-height: 1.45;
       word-break: break-word;
     }
 
@@ -105,15 +111,15 @@
       padding: 12px;
       gap: 8px;
       background: #0f172a;
-      border-top: 1px solid #334155;
+      border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
 
     input {
       flex: 1;
-      padding: 12px;
+      padding: 12px 14px;
       border-radius: 8px;
-      border: 1px solid #334155;
+      border: 1px solid var(--border);
       background: var(--card);
       color: var(--text);
       outline: none;
@@ -144,9 +150,9 @@
 
   <div class="chat-container">
     <header>
-      <div>
+      <div class="header-title">
         <span class="status-dot"></span>
-        <span style="font-weight: 600;">SBG (Simulated But Good)</span>
+        <span>SBG (Simulated But Good)</span>
       </div>
       <button onclick="clearMemory()" style="padding: 6px 10px; font-size: 0.75rem; background: #ef4444; border-radius: 6px;">Reset Memory</button>
     </header>
@@ -182,35 +188,20 @@
       topic: null,
       subTopic: null,
       questionState: null,
-      sentiment: "neutral"
+      sentiment: "neutral",
+      intent: null
     };
 
     const typoMap = {
-      "doimg": "doing",
-      "hwy": "hey",
-      "hw": "how",
-      "teh": "the",
-      "whta": "what",
-      "waht": "what",
-      "wats": "whats",
-      "thsi": "this",
-      "wnat": "want",
-      "wnna": "wanna",
-      "wana": "wanna",
-      "remeber": "remember",
-      "rember": "remember",
-      "gud": "good",
-      "goood": "good",
-      "grt": "great",
-      "plz": "please",
-      "pls": "please",
-      "truw": "true",
-      "trur": "true",
-      "becuase": "because",
-      "cuz": "cause",
-      "cos": "cause",
-      "naw": "nah",
-      "nop": "nope"
+      "doimg": "doing", "hwy": "hey", "hw": "how", "teh": "the", "whta": "what",
+      "waht": "what", "wats": "whats", "thsi": "this", "wnat": "want", "wnna": "wanna",
+      "wana": "wanna", "remeber": "remember", "rember": "remember", "gud": "good",
+      "goood": "good", "grt": "great", "plz": "please", "pls": "please", "truw": "true",
+      "trur": "true", "becuase": "because", "cuz": "cause", "cos": "cause", "naw": "nah",
+      "nop": "nope", "ply": "play", "playn": "playing", "modd": "mod", "modin": "modding",
+      "loding": "loading", "lodaer": "loader", "swich": "switch", "nintndo": "nintendo",
+      "plystation": "playstation", "plstation": "playstation", "xbo": "xbox", "xobox": "xbox",
+      "aromaa": "aroma", "tiramisuu": "tiramisu", "hombrew": "homebrew", "hombrewng": "homebrewing"
     };
 
     function getLevenshtein(a, b) {
@@ -231,7 +222,13 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma", "discussing", "pretendo", "whether", "released", "launch", "games", "android", "nintendo"];
+    const vocabulary = [
+      "doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want",
+      "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access",
+      "loader", "aroma", "discussing", "pretendo", "whether", "released", "launch", "games",
+      "android", "nintendo", "playstation", "xbox", "hardware", "software", "firmware",
+      "installed", "exploit", "payload", "tiramisu", "homebrew", "emulation", "retroarch"
+    ];
 
     function normalizeText(text) {
       return text.toLowerCase().replace(/--+/g, ' ').split(/\s+/).map(word => {
@@ -292,12 +289,12 @@
     }
 
     function extractConsole(sentence) {
-      const match = sentence.match(/\b(switch\s*2|nintendo\s+switch\s*2|wii\s+u|wii|ps1\s+slim|ps1|ps2\s+slim(?:\s+[a-z0-9-]+)?|ps2|ps3\s+slim|ps3\s+super\s+slim|ps3|ps4\s+pro|ps4\s+slim|ps4|ps5\s+slim|ps5\s+pro|ps5|xbox\s+360\s+s|xbox\s+360\s+e|xbox\s+360|xbox\s+one\s+s|xbox\s+one\s+x|xbox\s+one|xbox\s+series\s+s|xbox\s+series\s+x|xbox|gamecube|switch\s+oled|switch\s+lite|switch|new\s+3ds\s+xl|3ds\s+xl|2ds\s+xl|3ds|2ds|ds\s+lite|dsi\s+xl|dsi|ds|psp\s+go|psp|ps\s*vita)\b/i);
+      const match = sentence.match(/\b(switch\s*2|nintendo\s+switch\s*2|wii\s+u|wii|ps1\s+slim|ps1|ps2\s+slim(?:\s+[a-z0-9-]+)?|ps2|ps3\s+slim|ps3\s+super\s+slim|ps3|ps4\s+pro|ps4\s+slim|ps4|ps5\s+slim|ps5\s+pro|ps5|xbox\s+360\s+s|xbox\s+360\s+e|xbox\s+360|xbox\s+one\s+s|xbox\s+one\s+x|xbox\s+one|xbox\s+series\s+s|xbox\s+series\s+x|xbox|gamecube|n64|nintendo\s+64|snes|nes|game\s+boy\s+advance|gba|game\s+boy\s+color|gbc|game\s+boy|switch\s+oled|switch\s+lite|switch|new\s+3ds\s+xl|3ds\s+xl|2ds\s+xl|3ds|2ds|ds\s+lite|dsi\s+xl|dsi|ds|psp\s+go|psp|ps\s*vita|steam\s+deck|dreamcast|sega\s+saturn|genesis)\b/i);
       return match ? match[1].trim() : null;
     }
 
     function extractFeature(sentence) {
-      const match = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|freemcboot|fmcb|open\s+ps2\s+loader|opl|mechapow|hen|cfw|homebrew|pretendo|loadiine|nintendont)\b/i);
+      const match = sentence.match(/\b(payload-loader|payloadloader|aroma|tiramisu|freemcboot|fmcb|open\s+ps2\s+loader|opl|mechapow|hen|cfw|homebrew|pretendo|loadiine|nintendont|atmosphere|luma3ds|fastboot3ds|boot9strap|henkaku|adrenaline|retroarch|unlaunch|twilight\s+menu)\b/i);
       return match ? match[1].trim() : null;
     }
 
@@ -349,9 +346,10 @@
     }
 
     function detectSentiment(text) {
-      if (/\b(fuck|shit|damn|crap|hell|wtf|hate|annoyed|broken|trash|pissed)\b/i.test(text)) return "frustrated";
-      if (/\b(great|awesome|love|cool|fire|nice|hyped|smooth|good|best)\b/i.test(text)) return "positive";
-      if (/\b(bad|awful|sad|unhappy|tired|bored|sucks|terrible|horrible|depressed)\b/i.test(text)) return "negative";
+      if (/\b(fuck|shit|damn|crap|hell|wtf|hate|annoyed|broken|trash|pissed|bricked)\b/i.test(text)) return "frustrated";
+      if (/\b(great|awesome|love|cool|fire|nice|hyped|smooth|good|best|fantastic|goat)\b/i.test(text)) return "positive";
+      if (/\b(bad|awful|sad|unhappy|tired|bored|sucks|terrible|horrible|depressed|down)\b/i.test(text)) return "negative";
+      if (/\b(idk|confused|lost|unsure|how to|wondering)\b/i.test(text)) return "confused";
       return "neutral";
     }
 
@@ -386,7 +384,6 @@
         if (/^switch\s*2$/i.test(cleanName)) cleanName = "Nintendo Switch 2";
         if (/^wii\s*u$/i.test(cleanName)) cleanName = "Wii U";
 
-        // Tier 1: Search Category Members
         const catRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(cleanName.replace(/\s+/g, '_'))}_launch_titles&cmlimit=10&format=json&origin=*`);
         if (catRes.ok) {
           const catData = await catRes.json();
@@ -399,7 +396,6 @@
           }
         }
 
-        // Tier 2: Search the master launch titles table page
         const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=List_of_video_game_console_launch_titles&prop=text&redirects=1&format=json&origin=*`);
         if (res.ok) {
           const data = await res.json();
@@ -513,7 +509,6 @@
           }
         }
         
-        // Strip bracket tags, parenthesized pronunciation/translations, and magic words
         extract = extract
           .replace(/\[\d+\]/g, '')
           .replace(/\s*\([^)]*\)/g, '')
@@ -522,7 +517,6 @@
           .replace(/\s+/g, ' ')
           .trim();
         
-        // Repair sentences that accidentally start without their subject (e.g. "is a Japanese...")
         if (/^(?:is|are|was|were)\b/i.test(extract)) {
           extract = `${targetTitle} ${extract}`;
         }
@@ -632,7 +626,7 @@
         lastUserInput = clean;
       }
 
-      // 1. Feelings & Sentiment Expressions (Checked before Name Extraction)
+      // 1. Feelings & Sentiment Expressions
       const feelMatch = clean.match(/(?:i feel|i am feeling|im feeling|i'm feeling)\s+(.*)/i);
       if (feelMatch && feelMatch[1]) {
         const feeling = feelMatch[1].trim();
@@ -642,6 +636,12 @@
             `Sorry to hear you're feeling ${feeling}${nameTag}. Anything specific happen?`,
             `Ah, that's rough${nameTag}. What's making you feel ${feeling}?`,
             `Hate that you're feeling ${feeling}. What's going on today?`
+          ]);
+        } else if (contextStack.sentiment === "positive") {
+          return pickRandom([
+            `Love that energy! What's got you feeling ${feeling} today${nameTag}?`,
+            `Awesome! Feeling ${feeling} is a vibe. What are you getting into?`,
+            `That's what we like to hear! What's the plan while you're in a ${feeling} mood?`
           ]);
         }
         return pickRandom([
@@ -660,7 +660,23 @@
         ]);
       }
 
-      // 3. Release Date Query Intent
+      // 3. User Preference Fact Storage ("I like...", "My favorite...")
+      const favMatch = clean.match(/^(?:i (?:really )?(?:like|love|enjoy|prefer)|my fav(?:orite)? (?:game|console|thing)? is)\s+(.+)/i);
+      if (favMatch && favMatch[1]) {
+        const item = favMatch[1].trim();
+        if (item.length > 2 && !stopWords.has(item)) {
+          const facts = memory.get('facts') || [];
+          facts.push(`you like ${item}`);
+          memory.set('facts', facts);
+          return pickRandom([
+            `Got it! I'll keep in mind that you're into ${item}${nameTag}.`,
+            `Nice taste! Saved that you like ${item}. How long have you been into it?`,
+            `Solid choice! Logged into memory: you like ${item}.`
+          ]);
+        }
+      }
+
+      // 4. Release Date Query Intent
       const dateQueryMatch = clean.match(/^(?:when was|when did)\s+(?:the\s+)?([^,?!.]+?)\s+(?:released|come out|launch|launched)/i);
       if (dateQueryMatch && dateQueryMatch[1]) {
         const queryTerm = dateQueryMatch[1].trim();
@@ -676,7 +692,7 @@
         }
       }
 
-      // 4. Launch Games / Games List Specific Query
+      // 5. Launch Games / Games List Specific Query
       const isGamesQuery = /(?:launch games?|launch titles?|launch lineup|what games did it launch with|games for)\b/i.test(clean);
       if (isGamesQuery) {
         const detectedConsole = extractConsole(clean);
@@ -698,7 +714,7 @@
         }
       }
 
-      // 5. General Information Query Intent
+      // 6. General Information Query Intent
       const isInformationalQuery = /^(?:what(?:'s|s| is| are)?(?:\s+some|\s+an?|\s+the|\s+were)?|who(?:'s|s| is| was| were)?(?:\s+some|\s+an?|\s+the)?|tell me about|explain|search wikipedia for|lookup|define|list|show me)\s+(.+)/i.test(clean);
 
       if (isInformationalQuery) {
@@ -722,7 +738,7 @@
         }
       }
 
-      // 6. Compound Sentence & Multi-Clause Intent Engine
+      // 7. Compound Sentence & Multi-Clause Intent Engine
       const compoundSplit = rawInput.split(/\s+(?:and(?:\s+i)?|also(?:\s+i)?|plus(?:\s+i)?|then(?:\s+i)?|but(?:\s+i)?)\s+/i);
       if (compoundSplit.length >= 2) {
         const clause1 = compoundSplit[0].trim();
@@ -731,7 +747,7 @@
         const c1Console = extractConsole(clause1);
         const c1Feature = extractFeature(clause1);
         
-        const actionMatch = clause2.match(/(?:wanna|want to|plan to|trying to|thinking of|gonna)\s+(?:play|load|mod|set up|run|get)\s+([^,?!.]+)/i) ||
+        const actionMatch = clause2.match(/(?:wanna|want to|plan to|trying to|thinking of|gonna)\s+(?:play|load|mod|set up|run|get|dump)\s+([^,?!.]+)/i) ||
                             clause2.match(/(?:play|run|launch|load)\s+([^,?!.]+)/i);
 
         if ((c1Console || c1Feature) && actionMatch && actionMatch[1]) {
@@ -750,7 +766,7 @@
         }
       }
 
-      // 7. History & Conversation Recall
+      // 8. History & Conversation Recall
       const isHistoryCheck = /^(?:what (?:was i|were we|have we|did we|have i) (?:doing|done|talking about|talked about|talk about|saying|said|discussed|covered)|what did (?:i|we) (?:say|do|talk about)|recap|remind me what|what was that earlier)/i.test(rawLower);
       if (isHistoryCheck) {
         if (topicHistory.length === 0) {
@@ -764,7 +780,7 @@
         }
       }
 
-      // 8. Single-letter Ignore
+      // 9. Single-letter Ignore
       if (clean.length <= 1) {
         return pickRandom([
           `Just one letter? Type out a word${nameTag}!`,
@@ -773,7 +789,7 @@
         ]);
       }
 
-      // 9. Frustration / Outbursts
+      // 10. Frustration / Outbursts
       if (/^(fuck|shit|damn|crap|hell|wtf|bruh)\b/i.test(clean) || contextStack.sentiment === "frustrated") {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -784,7 +800,7 @@
         ]);
       }
 
-      // 10. Memory Factoid Storage
+      // 11. Memory Factoid Storage
       const rememberMatch = clean.match(/^(?:remember that|store this|remember)\s+(.*)/i);
       if (rememberMatch && rememberMatch[1]) {
         const factText = rememberMatch[1].trim();
@@ -817,7 +833,7 @@
         return info.join(". ") + ".";
       }
 
-      // 11. Directional Echos
+      // 12. Directional Echos
       if (/^(?:your|my)\s+(?:end|side)\b/i.test(clean)) {
         return pickRandom([
           `Just everything on my side! Code, memory, and logic are running smooth${nameTag}.`,
@@ -826,7 +842,7 @@
         ]);
       }
 
-      // 12. Status Return
+      // 13. Status Return
       if (/(?:how are you|how r u|how are u|how about you|hbu|wbu|what about you)/i.test(clean)) {
         contextStack.questionState = "ask_activity";
         if (/^(?:(?:i(?:'| a)?m|im)\s+)?(?:doing\s+)?(?:great|good|fine|well|pretty good|alright|chillin)/i.test(clean)) {
@@ -843,7 +859,7 @@
         ]);
       }
 
-      // 13. Positive Acknowledgements
+      // 14. Positive Acknowledgements
       if (/^(?:that(?:'s|s)?|it(?:'s|s)?|sounds?)\s+(?:good|great|cool|awesome|dope|nice|solid|valid|fair)\b/i.test(clean)) {
         return pickRandom([
           `Glad to hear it${nameTag}! What's next on your mind?`,
@@ -854,7 +870,7 @@
         ]);
       }
 
-      // 14. Inquiries & Deflections
+      // 15. Inquiries & Deflections
       if (/^(?:is (?:there )?something|is anything|are you having|having any|is something)\s+(?:troubling|wrong|bothering|bother|issue|problem)/i.test(clean) || /^(?:are you|r u)\s+(?:ok|okay|alright|fine|troubled|bothered)/i.test(clean)) {
         return pickRandom([
           `Not at all${nameTag}! Everything is running smoothly on my end. How about you?`,
@@ -895,7 +911,7 @@
         ]);
       }
 
-      // 15. Detected Feature / Sub-Topic on Active Context
+      // 16. Detected Feature / Sub-Topic on Active Context
       const detectedFeature = extractFeature(rawLower);
       if (detectedFeature) {
         contextStack.subTopic = detectedFeature;
@@ -926,7 +942,7 @@
         ]);
       }
 
-      // 16. Activity Updates
+      // 17. Activity Updates
       const isStatusOnly = /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:doing\s+)?(?:great|good|fine|well|alright|ok|okay)$/i.test(clean);
       if (!isStatusOnly && /^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i.test(clean)) {
         const activityMatch = clean.match(/^(?:(?:i(?:'| a)?m|im|just)\s+)?(?:up to|doing|chilling with|working on)\s+(.+)/i);
@@ -940,7 +956,7 @@
         }
       }
 
-      // 17. Feature Details
+      // 18. Feature Details
       if (/^(?:the coolest part|the best part|the best thing|it gives you|it gives|gives access|having access)\b/i.test(clean)) {
         contextStack.questionState = "ask_homebrew_apps";
         return pickRandom([
@@ -950,7 +966,7 @@
         ]);
       }
 
-      // 18. Vague Quantity Answers
+      // 19. Vague Quantity Answers
       if (/^(?:a lot of stuff|a lot|lots of stuff|lots|tons of stuff|bunch of stuff|all kinds of stuff|many things|everything)\b/i.test(clean)) {
         if (currentQuestionState === "ask_feature_details") {
           contextStack.questionState = "ask_specific_app";
@@ -969,7 +985,7 @@
         }
       }
 
-      // 19. Disagreements
+      // 20. Disagreements
       if (/^(no|nah|nope|not really|negative|naw)\b/i.test(clean)) {
         if (currentQuestionState === "echo_check") {
           return pickRandom([
@@ -985,7 +1001,7 @@
         ]);
       }
 
-      // 20. Positive Status
+      // 21. Positive Status
       if (/^(yeah|yea|yep|yup|ye|true|facts|real|fr|for real|good|great|fine|doing good|doing great|pretty good|not bad|decent|chillin|vibing|alright)\b/i.test(clean)) {
         if (currentQuestionState === "general_greeting" || currentQuestionState === "ask_how_are_you") {
           return pickRandom([
@@ -1005,7 +1021,7 @@
         }
       }
 
-      // 21. Topic Reasons
+      // 22. Topic Reasons
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
         if (contextStack.topic) {
           const topicWithArt = formatTopicWithArticle(contextStack.topic);
@@ -1023,7 +1039,7 @@
         }
       }
 
-      // 22. Name Recall
+      // 23. Name Recall
       if (/(?:what(?:'s|s| is)? (?:my )?name|who am i|do you know (?:my name|me))/i.test(clean)) {
         return fullName 
           ? pickRandom([
@@ -1034,7 +1050,7 @@
           : "I don't think you've told me your name yet! What should I call you?";
       }
 
-      // 23. Name Extraction (Explicitly excludes feelings/states/moods)
+      // 24. Name Extraction
       const isInvalidNamePhrase = /^(?:feeling|sad|bad|good|great|fine|happy|up to|doing|going|playing|modding|chilling|working|making|trying|just)\b/i.test(clean.replace(/^(?:i am|im|i'm)\s+/i, ''));
       const nameMatch = rawInput.match(/^(?:my name is|call me|i am|im|i'm)\s+([a-zA-Z\s]+)$/i);
       
@@ -1061,7 +1077,7 @@
         ]);
       }
 
-      // 24. Natural Short Acknowledgements
+      // 25. Natural Short Acknowledgements
       if (/^(ok|okay|k|cool|alright|bet|nice|neat|word|gotcha)\b/i.test(clean)) {
         return pickRandom([
           `Gotcha! What's next on your mind${nameTag}?`,
@@ -1072,12 +1088,12 @@
         ]);
       }
 
-      // 25. Help & Commands
+      // 26. Help & Commands
       if (clean.includes("what can you do") || clean.includes("help") || clean.includes("commands") || clean.includes("features")) {
-        return `Here's what I can do: dynamically lookup console info and launch game lineups on Wikipedia, parse compound sentences, track topics across turns, and remember facts${nameTag}!`;
+        return `Here's what I can do: dynamically lookup console info and launch game lineups on Wikipedia, parse compound sentences, track topics across turns, track mood & preferences, and remember facts${nameTag}!`;
       }
 
-      // 26. Identity
+      // 27. Identity
       if (clean.includes("who are you") || clean.includes("what are you")) {
         return pickRandom([
           `I'm SBG: Simulated But Good! A lightweight AI engine running right in your browser${nameTag}.`,
@@ -1085,7 +1101,7 @@
         ]);
       }
 
-      // 27. Greetings
+      // 28. Greetings
       if (/^(hi|hello|hey|yo|sup)\b/i.test(clean)) {
         contextStack.questionState = "ask_how_are_you";
         return pickRandom([
@@ -1096,7 +1112,7 @@
         ]);
       }
 
-      // 28. Single Topic / Console Name Handler (Searches Wikipedia + Follows Up)
+      // 29. Single Topic / Console Name Handler (Searches Wikipedia + Follows Up)
       const extractedSubject = extractSubject(rawInput);
       if (extractedSubject && extractedSubject.length > 1) {
         const subKey = extractedSubject.toLowerCase();
@@ -1136,14 +1152,14 @@
         ]);
       }
 
-      // 29. Memory Anchors
+      // 30. Memory Anchors
       const facts = memory.get('facts') || [];
       if (facts.length > 0 && Math.random() > 0.6) {
         const randomFact = facts[Math.floor(Math.random() * facts.length)];
         return `That reminds me... earlier you mentioned that ${randomFact}. Is that related${nameTag}?`;
       }
 
-      // 30. Clean Fallbacks
+      // 31. Clean Fallbacks
       return pickRandom([
         `Interesting! Tell me more about that${nameTag}.`,
         `Makes sense${nameTag}. What else?`,
@@ -1177,7 +1193,8 @@
         topic: null,
         subTopic: null,
         questionState: "ask_name",
-        sentiment: "neutral"
+        sentiment: "neutral",
+        intent: null
       };
       lastUserInput = "";
       repeatCount = 0;
