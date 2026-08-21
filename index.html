@@ -231,7 +231,7 @@
       return matrix[b.length][a.length];
     }
 
-    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma", "discussing", "pretendo", "whether", "released", "launch", "games", "android"];
+    const vocabulary = ["doing", "hello", "what", "whats", "remember", "good", "great", "name", "wanna", "want", "play", "cool", "yeah", "true", "because", "cause", "nope", "talking", "earlier", "access", "loader", "aroma", "discussing", "pretendo", "whether", "released", "launch", "games", "android", "nintendo"];
 
     function normalizeText(text) {
       return text.toLowerCase().replace(/--+/g, ' ').split(/\s+/).map(word => {
@@ -513,13 +513,19 @@
           }
         }
         
+        // Strip bracket tags, parenthesized pronunciation/translations, and magic words
         extract = extract
           .replace(/\[\d+\]/g, '')
-          .replace(/\([^)]*\)/g, '')
+          .replace(/\s*\([^)]*\)/g, '')
           .replace(/__[A-Z_]+__/g, '')
           .replace(/\s+([,.;!?])/g, '$1')
           .replace(/\s+/g, ' ')
           .trim();
+        
+        // Repair sentences that accidentally start without their subject (e.g. "is a Japanese...")
+        if (/^(?:is|are|was|were)\b/i.test(extract)) {
+          extract = `${targetTitle} ${extract}`;
+        }
         
         extract = extract.replace(/released in Japan on [^,]+, in North America on [^,]+, and in Europe on [^.]+/i, (match) => {
           const year = match.match(/\b(19\d\d|20\d\d)\b/);
