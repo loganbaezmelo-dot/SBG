@@ -337,6 +337,17 @@
       return null;
     }
 
+    function formatTopicWithArticle(subject, wikiOverviewText = "") {
+      const clean = subject.trim();
+      const isConsole = extractConsole(clean) !== null;
+      const startsWithThe = wikiOverviewText && /^the\s+/i.test(wikiOverviewText.trim());
+
+      if (isConsole || startsWithThe) {
+        return clean.toLowerCase().startsWith('the ') ? clean : `the ${clean}`;
+      }
+      return clean;
+    }
+
     function detectSentiment(text) {
       if (/\b(fuck|shit|damn|crap|hell|wtf|hate|annoyed|broken|trash|pissed)\b/i.test(text)) return "frustrated";
       if (/\b(great|awesome|love|cool|fire|nice|hyped|smooth|good|best)\b/i.test(text)) return "positive";
@@ -368,7 +379,6 @@
       }
     }
 
-    // Dynamic Multi-Tier Launch Games Fetcher
     async function fetchWikipediaLaunchGames(rawConsoleName) {
       try {
         let cleanName = rawConsoleName.replace(/^(?:the\s+)/i, '').trim();
@@ -641,6 +651,7 @@
           .replace(/\s+(?:launch games?|launch titles?|launch lineup|games?|titles?)$/i, '')
           .trim();
 
+        const formattedTarget = formatTopicWithArticle(targetConsole);
         const gamesSummary = await fetchWikipediaSummary(targetConsole, "games");
         if (gamesSummary) {
           return pickRandom([
@@ -649,7 +660,7 @@
             `Looked that up! Basically, ${gamesSummary}`
           ]);
         } else {
-          return `I checked Wikipedia, but couldn't find an official launch game lineup for the ${targetConsole}${nameTag}!`;
+          return `I checked Wikipedia, but couldn't find an official launch game lineup for ${formattedTarget}${nameTag}!`;
         }
       }
 
@@ -691,14 +702,14 @@
 
         if ((c1Console || c1Feature) && actionMatch && actionMatch[1]) {
           const actionTarget = actionMatch[1].replace(/^(?:some|the|a|an)\s+/i, '').trim();
-          const activeSys = c1Console || contextStack.topic || "that setup";
+          const activeSys = c1Console ? formatTopicWithArticle(c1Console) : (contextStack.topic ? formatTopicWithArticle(contextStack.topic) : "that setup");
           const activeEnv = c1Feature || contextStack.subTopic || "homebrew";
 
           if (c1Console) contextStack.topic = c1Console;
           if (c1Feature) contextStack.subTopic = c1Feature;
 
           return pickRandom([
-            `Running ${activeEnv} on the ${activeSys} while playing ${actionTarget} is a fire setup${nameTag}! Are you jumping into it now?`,
+            `Running ${activeEnv} on ${activeSys} while playing ${actionTarget} is a fire setup${nameTag}! Are you jumping into it now?`,
             `Solid plan! Having ${activeEnv} ready on ${activeSys} makes running ${actionTarget} super easy. How's it running so far?`,
             `Getting ${activeEnv} set up on ${activeSys} just to hop on ${actionTarget} sounds awesome${nameTag}! Need any other tweaks for it?`
           ]);
@@ -711,9 +722,10 @@
         if (topicHistory.length === 0) {
           return `We haven't brought up any specific topics yet${nameTag}! What's on your mind?`;
         } else if (topicHistory.length === 1) {
-          return `Earlier you were talking about the ${topicHistory[0]}${nameTag}!`;
+          const topicWithArt = formatTopicWithArticle(topicHistory[0]);
+          return `Earlier you were talking about ${topicWithArt}${nameTag}!`;
         } else {
-          const pastList = [...new Set(topicHistory)].join(", ");
+          const pastList = [...new Set(topicHistory)].map(t => formatTopicWithArticle(t)).join(", ");
           return `Earlier in our chats, we covered: ${pastList}${nameTag}!`;
         }
       }
@@ -746,9 +758,10 @@
         
         let storedFact = factText;
         if (contextStack.topic && (factText === contextStack.topic.toLowerCase() || factText === "it")) {
+          const targetWithArt = formatTopicWithArticle(contextStack.topic);
           storedFact = contextStack.subTopic 
             ? `you have ${contextStack.subTopic} on your ${contextStack.topic}`
-            : `you have a ${contextStack.topic}`;
+            : `you have ${targetWithArt}`;
         }
         
         facts.push(storedFact);
@@ -866,7 +879,8 @@
           }
         }
 
-        const target = contextStack.topic ? ` on the ${contextStack.topic}` : "";
+        const targetWithArt = contextStack.topic ? formatTopicWithArticle(contextStack.topic) : "";
+        const target = targetWithArt ? ` on ${targetWithArt}` : "";
         contextStack.questionState = "ask_feature_details";
         
         return pickRandom([
@@ -960,11 +974,12 @@
       // 19. Topic Reasons
       if (/^(?:cause|because|cuz|since|reason is)\b/i.test(clean) || (currentQuestionState === "ask_why_topic" && clean.includes("cool"))) {
         if (contextStack.topic) {
+          const topicWithArt = formatTopicWithArticle(contextStack.topic);
           contextStack.questionState = "ask_favorite_feature";
           return pickRandom([
-            `Valid reason! What's your favorite thing about the ${contextStack.topic}${nameTag}?`,
-            `Makes total sense! What do you like most about the ${contextStack.topic}?`,
-            `That's definitely a solid point! How often do you use the ${contextStack.topic}${nameTag}?`
+            `Valid reason! What's your favorite thing about ${topicWithArt}${nameTag}?`,
+            `Makes total sense! What do you like most about ${topicWithArt}?`,
+            `That's definitely a solid point! How often do you use ${topicWithArt}${nameTag}?`
           ]);
         } else {
           return pickRandom([
@@ -1082,27 +1097,27 @@
           memory.set('history', topicHistory);
         }
 
-        // Fetch overview from Wikipedia for this topic
         const wikiOverview = await fetchWikipediaSummary(extractedSubject, "general");
+        const formattedTopic = formatTopicWithArticle(extractedSubject, wikiOverview || "");
 
         if (previouslyDiscussed && linkedFeatures.length > 0) {
           const featureList = linkedFeatures.join(" & ");
           return pickRandom([
-            `Back to the ${extractedSubject}! Are we still working with ${featureList}, or doing something new${nameTag}?`,
-            `Returning to the ${extractedSubject} setup with ${featureList}! What's the latest with it?`
+            `Back to ${formattedTopic}! Are we still working with ${featureList}, or doing something new${nameTag}?`,
+            `Returning to ${formattedTopic} setup with ${featureList}! What's the latest with it?`
           ]);
         }
 
         contextStack.questionState = "ask_why_topic";
 
         if (wikiOverview) {
-          return `${wikiOverview} What do you want to do with ${extractedSubject}${nameTag}?`;
+          return `${wikiOverview} What do you want to do with ${formattedTopic}${nameTag}?`;
         }
 
         return pickRandom([
-          `What do you want to do with ${extractedSubject}${nameTag}?`,
-          `What got you interested in ${extractedSubject}${nameTag}?`,
-          `Tell me more about what you're doing with ${extractedSubject}${nameTag}!`
+          `What do you want to do with ${formattedTopic}${nameTag}?`,
+          `What got you interested in ${formattedTopic}${nameTag}?`,
+          `Tell me more about what you're doing with ${formattedTopic}${nameTag}!`
         ]);
       }
 
